@@ -30,3 +30,9 @@ bin/
 *.ipr
 *.iws
 out/
+
+### Eclipse IDE ###
+.factorypath
+.project
+.classpath
+.settings/
