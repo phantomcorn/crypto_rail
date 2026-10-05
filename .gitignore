@@ -1,0 +1,25 @@
+### Gradle ###
+.gradle/
+**/build/
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Cache of project tasks
+.gradletasknamecache
+
+### Gradle Wrapper Exceptions ###
+# Do NOT ignore the Gradle wrapper files; they must be committed so others can build the project.
+!gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.properties
+
+### IDE Specifics (Optional but recommended) ###
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+bin/
