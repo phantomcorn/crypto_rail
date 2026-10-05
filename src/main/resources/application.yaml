@@ -1,3 +1,23 @@
 spring:
   application:
     name: crypto-rail
+  datasource:
+    url: jdbc:postgresql://localhost:5432/crypto_rail
+    username: crypto
+    password: crypto
+  jpa:
+    hibernate:
+      ddl-auto: validate      # Flyway owns the schema; Hibernate only checks it
+    open-in-view: false
+    properties:
+      hibernate.format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  logging:
+    level:
+      org:
+        springframework:
+          security=DEBUG:
+  profile:
+    active: dev
