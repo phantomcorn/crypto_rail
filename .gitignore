@@ -23,3 +23,10 @@ gradle-app.setting
 .classpath
 .settings/
 bin/
+
+### JetBrains IDEs (.idea) ###
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
