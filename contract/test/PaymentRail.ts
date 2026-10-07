@@ -1,7 +1,8 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { keccak256,encodeBytes32String  } from "ethers";
+import { keccak256,encodeBytes32String, Contract  } from "ethers";
+import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
 
 const { ethers } = await network.create();
 
@@ -80,16 +81,80 @@ function encode(data: string) {
   return encodeBytes32String(data)
 }
 
+async function signAndPayOK(
+  token: Contract, 
+  merchant: HardhatEthersSigner, 
+  owner: HardhatEthersSigner,
+  gateway: PaymentRail, 
+  validInvoice: InvoiceDetails, 
+  validDomain: DomainDetails) {
+
+
+  const signature = await generateSignature(owner, validInvoice, validDomain)
+
+  await gateway.pay(
+    validInvoice.invoiceId, 
+    await token.getAddress(),
+    TRANSFER_AMOUNT, 
+    await merchant.getAddress(), 
+    validInvoice.deadline,
+    signature)
+}
+
 describe("PaymentRail", function () {
-  it("Can construct", async function () {});
+  it("Can construct", async function () {
+    const gateway = await ethers.deployContract("PaymentRail");
+  });
 
-  it("Owner of PaymentRail is deployer", async function() {})
+  it("Owner of PaymentRail is deployer", async function() {
+    const [owner, nonOwner] = await ethers.getSigners();
+    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
+    const gateway = await gatewayFactory.connect(owner).deploy();
+    
+    expect(await gateway.owner()).equals(owner.address);
+    expect(await gateway.owner()).is.not.equals(nonOwner.address)
+  })
 
-  it("Only owner can set the trusted server address", async function() {})
+  it("Only owner can set the trusted server address", async function() {
+    const [owner, nonOwner] = await ethers.getSigners();
+    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
+    const gateway = await gatewayFactory.connect(owner).deploy();
+    
+    expect(await gateway.connect(owner).setServerAddr(TRUSTED_SERVER_ADDR))
+    expect(await gateway.connect(nonOwner).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "j")
+  })
   
-  it("Transfer exact amount from buyer to merchant", async function() {})
+  it("Transfer exact amount from buyer to merchant", async function() {
+    const {token, owner, merchant, buyer, gateway, validDomain, validInvoice} = await deploySystem();
 
-  it("Contract holds no tokens after payment (non-custodial)")
+    expect(await token.balanceOf(merchant.address)).equals(0);
+    expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT);
+
+    await token.approve(await gateway.getAddress(), TRANSFER_AMOUNT)
+
+    const signature = await generateSignature(owner, validInvoice, validDomain)
+
+    await gateway.pay(
+      validInvoice.invoiceId, 
+      await token.getAddress(),
+      TRANSFER_AMOUNT, 
+      await merchant.getAddress(), 
+      validInvoice.deadline,
+      signature)
+
+    expect(await token.balanceOf(merchant.address)).equals(TRANSFER_AMOUNT);
+    expect(await token.balanceOf(buyer.address)).equals(0);
+  })
+
+  it("Contract holds no tokens after payment (non-custodial)", async function() {
+
+    const {token, owner, merchant, gateway, validDomain, validInvoice} = await deploySystem();
+
+    expect(await token.balanceOf(await gateway.getAddress())).equals(0)
+    await signAndPayOK(token, merchant, owner, gateway, validInvoice, validDomain)
+    expect(await token.balanceOf(await gateway.getAddress())).equals(0)
+  })
+  
   it("Same buyer can pay two different invoices")
   it("Succesful transfer emits PaymentRecieved event with correct args")
   it("An expired signature cannot be used")
