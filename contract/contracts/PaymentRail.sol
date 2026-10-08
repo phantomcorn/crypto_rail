@@ -26,6 +26,7 @@ contract PaymentRail is Ownable {
         require(signerAddr != address(0), "Invalid signature");
         require(signerAddr == serverAddr, "Signer must be from real server address");
 
+        hasPaid[invoiceId] = true;
         IERC20(tokenAddr).transferFrom(msg.sender, merchantAddr, amount);
         emit PaymentRecieved(invoiceId, amount, merchantAddr);
     }
