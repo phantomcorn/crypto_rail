@@ -34,7 +34,7 @@ contract PaymentRail is Ownable {
         serverAddr = newServerAddr;
     }
 
-    function extractVRS(bytes32 signature) internal pure returns(uint8, bytes32, bytes32) {
+    function extractVRS(bytes memory signature) internal pure returns(uint8, bytes32, bytes32) {
         require(signature.length == 65, "Invalid signature length");
 
         uint8 v;
@@ -45,15 +45,9 @@ contract PaymentRail is Ownable {
             First 32 bytes of a dynamic array store the length of the array.
             We skip the first 32 bytes to read the actual data.
             */
-
-            // Load the next 32 bytes into r
-            r := byte(0,mload(add(signature, 32)))
-
-            // Load the next 32 bytes into s
-            s := byte(0,mload(add(signature, 64)))
-
-            // Load the final byte into v (mload reads 32 bytes, but we mask/cast it)
-            v := mload(add(signature, 96))
+            r := mload(add(signature, 32))
+            s := mload(add(signature, 64))
+            v := byte(0, mload(add(signature, 96)))
         }
 
         return (uint8(v),bytes32(r),bytes32(s));
