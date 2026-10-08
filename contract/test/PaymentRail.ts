@@ -1,33 +1,19 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { keccak256,encodeBytes32String, Contract  } from "ethers";
+import { keccak256, type TypedDataDomain, type TypedDataField, encodeBytes32String } from "ethers";
 import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
+import type { MockERC20 } from "../types/ethers-contracts/MockERC20.js";
 
 const { ethers } = await network.create();
 
-const TRUSTED_SERVER_ADDR = "0x01234567890234567890"
-const UNTRUSTED_SERVER_ADDR = "0x98765432109876543210"
-const REAL_NETWORK = "1"
-const FAKE_NETWORK = "11155111"
+const TRUSTED_SERVER_ADDR = "0x0123456789023456789001234567890234567890"
+const UNTRUSTED_SERVER_ADDR = "0x9876543210987654321098765432109876543210"
+const REAL_NETWORK = 1
+const FAKE_NETWORK = 11155111
 const TRANSFER_AMOUNT = 30;
 const INVOICE_ID = "32"
 const FIVE_MINUTES = 300
-
-interface InvoiceDetails {
-  invoiceId: string,
-  tokenAddr: string,
-  amount: number,
-  deadline: number
-}
-
-interface DomainDetails {
-  appName: string
-  version: string
-  contractAddr: string
-  networkId: string
-}
-
 
 
 async function deploySystem() {
@@ -35,70 +21,64 @@ async function deploySystem() {
   const token = await ethers.deployContract("MockERC20");
   await token.mint(buyer.address, TRANSFER_AMOUNT);
   const gateway = await ethers.deployContract("PaymentRail");
-  const validInvoice: InvoiceDetails = {
-    invoiceId: INVOICE_ID,
+  await gateway.setServerAddr(owner.address);
+  return {buyer, merchant, owner, token, gateway}
+}
+
+async function serverCreateInvoice( 
+  owner: HardhatEthersSigner,
+  token: MockERC20, 
+  merchant: HardhatEthersSigner, 
+  gateway: PaymentRail,
+) {
+  const domain = {
+    name: "app",
+    version: "1",
+    chainId: REAL_NETWORK,
+    verifyingContract: await gateway.getAddress(),
+  }
+  //function pay(bytes32 invoiceId, address tokenAddr, uint amount, address merchantAddr, uint deadline, bytes32 signature) external {
+  const types = {
+    Pay: [
+      { name: "invoiceId", type: "bytes32"},
+      { name: "tokenAddr", type: "address"},
+      { name: "amount", type: "uint"},
+      { name: "merchantAddr", type: "address"},
+      { name: "deadline", type: "uint"},
+    ]
+  }
+  const value = {
+    invoiceId: encodeBytes32String(INVOICE_ID),
     tokenAddr: await token.getAddress(),
     amount: 30,
-    deadline: Date.now() + FIVE_MINUTES
+    merchantAddr: await merchant.getAddress(),
+    deadline: Math.floor(Date.now() / 1000) + FIVE_MINUTES
   }
-  const validDomain: DomainDetails = {
-    appName: "Bean",
-    version: "1",
-    contractAddr: await gateway.getAddress(),
-    networkId: REAL_NETWORK
-  }
-  return {buyer, merchant, owner, token, gateway, validInvoice, validDomain}
-}
 
-async function generateSignature(
-  signer: HardhatEthersSigner, 
-  invoiceDetails: InvoiceDetails,
-  domainDetails: DomainDetails
-) {
-  const structHash = hashStruct(invoiceDetails)
-  const domainSeperator = hashStructDomain(domainDetails)
-
-  const signature = signer.signMessage(`\x19\x01${structHash}${domainSeperator}`)
-  return signature
-}
-  
-
-function hashStruct(data: InvoiceDetails) {
-  const {invoiceId, tokenAddr, amount ,deadline} = data
-  const typeHash = keccak256("pay(bytes32 invoiceId,address tokenAddr,uint amount,address merchantAddr,uint deadline,bytes32 signature)")
-  const encodeData = encode(invoiceId) + encode(tokenAddr) + encode(`${amount}`) +encode(`${deadline}`)
-  return keccak256(typeHash + encodeData)
-}
-
-function hashStructDomain(data: DomainDetails) {
-  const {appName, version, contractAddr, networkId} = data
-  const typeHash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-  const encodeData = encode(appName) + encode(version) + encode(contractAddr) + encode(networkId)
-  return keccak256(typeHash + encodeData)
-}
-
-function encode(data: string) {
-  return encodeBytes32String(data)
+  const hash = ethers.TypedDataEncoder.hash(domain, types, value)
+  const signature = await owner.signTypedData(domain, types, value)
+  return {hash, signature, value}
 }
 
 async function signAndPayOK(
-  token: Contract, 
+  token: MockERC20, 
   merchant: HardhatEthersSigner, 
+  buyer: HardhatEthersSigner,
   owner: HardhatEthersSigner,
-  gateway: PaymentRail, 
-  validInvoice: InvoiceDetails, 
-  validDomain: DomainDetails) {
-
-
-  const signature = await generateSignature(owner, validInvoice, validDomain)
-
-  await gateway.pay(
-    validInvoice.invoiceId, 
+  gateway: PaymentRail,
+  value: Record<string, any>,
+  hash: string,
+  signature: string
+) {
+  await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT)
+  await gateway.connect(buyer).pay(
+    value.invoiceId, 
     await token.getAddress(),
     TRANSFER_AMOUNT, 
     await merchant.getAddress(), 
-    validInvoice.deadline,
-    signature)
+    value.deadline,
+    signature, 
+    hash)
 }
 
 describe("PaymentRail", function () {
@@ -115,6 +95,8 @@ describe("PaymentRail", function () {
     expect(await gateway.owner()).is.not.equals(nonOwner.address)
   })
 
+  it("Initially, owner of PaymentRail is also the server")
+
   it("Only owner can set the trusted server address", async function() {
     const [owner, nonOwner] = await ethers.getSigners();
     const gatewayFactory = await ethers.getContractFactory("PaymentRail");
@@ -125,33 +107,23 @@ describe("PaymentRail", function () {
   })
   
   it("Transfer exact amount from buyer to merchant", async function() {
-    const {token, owner, merchant, buyer, gateway, validDomain, validInvoice} = await deploySystem();
-
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value} = await serverCreateInvoice(owner, token, merchant, gateway)
     expect(await token.balanceOf(merchant.address)).equals(0);
     expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT);
 
-    await token.approve(await gateway.getAddress(), TRANSFER_AMOUNT)
-
-    const signature = await generateSignature(owner, validInvoice, validDomain)
-
-    await gateway.pay(
-      validInvoice.invoiceId, 
-      await token.getAddress(),
-      TRANSFER_AMOUNT, 
-      await merchant.getAddress(), 
-      validInvoice.deadline,
-      signature)
+    await signAndPayOK(token, merchant, buyer, owner, gateway, value, hash, signature)
 
     expect(await token.balanceOf(merchant.address)).equals(TRANSFER_AMOUNT);
     expect(await token.balanceOf(buyer.address)).equals(0);
   })
 
   it("Contract holds no tokens after payment (non-custodial)", async function() {
-
-    const {token, owner, merchant, gateway, validDomain, validInvoice} = await deploySystem();
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value} = await serverCreateInvoice(owner, token, merchant, gateway)
 
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
-    await signAndPayOK(token, merchant, owner, gateway, validInvoice, validDomain)
+    await signAndPayOK(token, merchant, buyer, owner, gateway, value, hash, signature)
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
   })
   
