@@ -26,6 +26,8 @@ async function deploySystem() {
 }
 
 async function serverCreateInvoice( 
+  invoiceId: string,
+  amount: number,
   owner: HardhatEthersSigner,
   token: MockERC20, 
   merchant: HardhatEthersSigner, 
@@ -48,9 +50,9 @@ async function serverCreateInvoice(
     ]
   }
   const value = {
-    invoiceId: encodeBytes32String(INVOICE_ID),
+    invoiceId: encodeBytes32String(invoiceId),
     tokenAddr: await token.getAddress(),
-    amount: 30,
+    amount: amount,
     merchantAddr: await merchant.getAddress(),
     deadline: Math.floor(Date.now() / 1000) + FIVE_MINUTES
   }
@@ -64,7 +66,6 @@ async function signAndPayOK(
   token: MockERC20, 
   merchant: HardhatEthersSigner, 
   buyer: HardhatEthersSigner,
-  owner: HardhatEthersSigner,
   gateway: PaymentRail,
   value: Record<string, any>,
   hash: string,
@@ -74,7 +75,7 @@ async function signAndPayOK(
   await gateway.connect(buyer).pay(
     value.invoiceId, 
     await token.getAddress(),
-    TRANSFER_AMOUNT, 
+    value.amount, 
     await merchant.getAddress(), 
     value.deadline,
     signature, 
@@ -108,11 +109,11 @@ describe("PaymentRail", function () {
   
   it("Transfer exact amount from buyer to merchant", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
-    const {hash, signature, value} = await serverCreateInvoice(owner, token, merchant, gateway)
+    const {hash, signature, value} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
     expect(await token.balanceOf(merchant.address)).equals(0);
     expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT);
 
-    await signAndPayOK(token, merchant, buyer, owner, gateway, value, hash, signature)
+    await signAndPayOK(token, merchant, buyer, gateway, value, hash, signature)
 
     expect(await token.balanceOf(merchant.address)).equals(TRANSFER_AMOUNT);
     expect(await token.balanceOf(buyer.address)).equals(0);
@@ -120,10 +121,10 @@ describe("PaymentRail", function () {
 
   it("Contract holds no tokens after payment (non-custodial)", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
-    const {hash, signature, value} = await serverCreateInvoice(owner, token, merchant, gateway)
+    const {hash, signature, value} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
 
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
-    await signAndPayOK(token, merchant, buyer, owner, gateway, value, hash, signature)
+    await signAndPayOK(token, merchant, buyer, gateway, value, hash, signature)
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
   })
   
