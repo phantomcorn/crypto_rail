@@ -14,21 +14,19 @@ contract PaymentRail is Ownable {
 
     event PaymentRecieved(bytes32 invoiceId, uint amount, address merchantAddr);
 
-    constructor() Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {}
 
-    }
-
-    function pay(bytes32 invoiceId, address token, uint amount, address merchantAddr, uint deadline, bytes32 signature) external {
+    function pay(bytes32 invoiceId, address tokenAddr, uint amount, address merchantAddr, uint deadline, bytes memory signature, bytes32 digest) external {
         require(!hasPaid[invoiceId], "Invoice already paid");
         require(deadline > block.timestamp, "Signature expired");
 
         (uint8 v, bytes32 r, bytes32 s) = extractVRS(signature);
-        address signerAddr = ecrecover(signature, v,r,s);
+        address signerAddr = ecrecover(digest, v,r,s);
 
         require(signerAddr != address(0), "Invalid signature");
         require(signerAddr == serverAddr, "Signer must be from real server address");
 
-        IERC20(token).transferFrom(msg.sender, merchantAddr, amount);
+        IERC20(tokenAddr).transferFrom(msg.sender, merchantAddr, amount);
         emit PaymentRecieved(invoiceId, amount, merchantAddr);
     }
 
