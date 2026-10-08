@@ -18,7 +18,7 @@ contract PaymentRail is Ownable {
 
     function pay(bytes32 invoiceId, address tokenAddr, uint amount, address merchantAddr, uint deadline, bytes memory signature, bytes32 digest) external {
         require(!hasPaid[invoiceId], "Invoice already paid");
-        require(deadline > block.timestamp, "Signature expired");
+        require(deadline >= block.timestamp, "Signature expired");
 
         (uint8 v, bytes32 r, bytes32 s) = extractVRS(signature);
         address signerAddr = ecrecover(digest, v,r,s);
