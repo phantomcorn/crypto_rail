@@ -37,11 +37,11 @@ contract PaymentRail is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
-    function pay(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature, bytes32 digest) external {
+    function pay(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature) external {
         require(!hasPaid[invoice.id], "Invoice already paid");
         require(invoice.deadline >= block.timestamp, "Signature expired");
 
-        verify(invoice, domain, signature, digest);
+        verify(invoice, domain, signature);
 
         hasPaid[invoice.id] = true;
         IERC20(invoice.tokenAddr).transferFrom(msg.sender, invoice.merchantAddr, invoice.amount);
@@ -53,11 +53,9 @@ contract PaymentRail is Ownable {
         serverAddr = newServerAddr;
     }
 
-    function verify(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature, bytes32 digest) internal view {
+    function verify(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature) internal view {
         bytes32 domainSeparator = hashStructDomain(domain);
-        bytes32 computedDigest = keccak256(abi.encodePacked("\x19\x01",domainSeparator,hashStructInvoice(invoice)));
-        require(computedDigest == digest, "Invalid signature (tampered, replay)");
-        
+        bytes32 computedDigest = keccak256(abi.encodePacked("\x19\x01",domainSeparator,hashStructInvoice(invoice)));        
         require(signature.length == 65, "Invalid signature length");
         uint8 v;
         bytes32 r;
@@ -71,9 +69,8 @@ contract PaymentRail is Ownable {
             s := mload(add(signature, 64))
             v := byte(0, mload(add(signature, 96)))
         }
-        address signerAddr = ecrecover(digest, v,r,s);
-        require(signerAddr != address(0), "Invalid signature (does not match digest)");
-        require(signerAddr == serverAddr, "Signer must be from real server address");
+        address signer = ecrecover(computedDigest, v,r,s);
+        require(signer != address(0) && signer == serverAddr , "Invalid signature");
     }
 
     function hashStructInvoice(Invoice memory invoice) internal pure returns(bytes32) {
