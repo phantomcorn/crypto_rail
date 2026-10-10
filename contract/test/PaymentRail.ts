@@ -115,9 +115,9 @@ describe("PaymentRail", function () {
     const [owner, nonOwner] = await ethers.getSigners();
     const gatewayFactory = await ethers.getContractFactory("PaymentRail");
     const gateway = await gatewayFactory.connect(owner).deploy();
-    
+    expect(await gateway.owner()).equals(owner.address);
     expect(await gateway.connect(owner).setServerAddr(TRUSTED_SERVER_ADDR))
-    expect(await gateway.connect(nonOwner).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "j")
+    await expect(gateway.connect(nonOwner).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
   })
   
   it("Transfer exact amount from buyer to merchant", async function() {
