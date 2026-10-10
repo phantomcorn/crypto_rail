@@ -18,7 +18,8 @@ const TAMPERED_INVOICE_ID = "99"
 const TAMPERED_TOKEN_ADDR = "0xf531B8F309be94191af87605cfbf600d71c2cfe0"
 const TAMPERED_AMOUNT = 99
 const TAMPERD_MERCHANT_ADDR = Wallet.createRandom().address
-const TAMPERED_DEALINE = await networkHelpers.time.latest() + 99999
+const TAMPERED_DEADLINE = await networkHelpers.time.latest() + 99999
+const TAMPERED_DEADLINE_DECREASE = await networkHelpers.time.latest()
 const MALFORMED_SIGNATURE = ""
 
 async function deploySystem() {
@@ -86,8 +87,8 @@ async function approveAndPay(
   hash: string,
   signature: string
 ) {
-  await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT)
-  await gateway.connect(buyer).pay(
+  await token.connect(buyer).approve(await gateway.getAddress(), value.amount) //if current time is t then this gets mined at block t=n+1
+  await gateway.connect(buyer).pay( //similarly, pay mined at t + 2
     value,
     domain,
     signature, 
@@ -158,7 +159,7 @@ describe("PaymentRail", function () {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
     const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
     
-    await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT - 1)
+    await token.connect(buyer).approve(await gateway.getAddress(), value.amount - 1)
     await expect(gateway.connect(buyer).pay(
       value,
       domain,
