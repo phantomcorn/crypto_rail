@@ -5,7 +5,7 @@ import { keccak256, type TypedDataDomain, type TypedDataField, encodeBytes32Stri
 import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
 import type { MockERC20 } from "../types/ethers-contracts/MockERC20.js";
 
-const { ethers } = await network.create();
+const { ethers, networkHelpers } = await network.create();
 
 const TRUSTED_SERVER_ADDR = "0x0123456789023456789001234567890234567890"
 const UNTRUSTED_SERVER_ADDR = "0x9876543210987654321098765432109876543210"
@@ -33,51 +33,58 @@ async function serverCreateInvoice(
   merchant: HardhatEthersSigner, 
   gateway: PaymentRail,
 ) {
+
+  const types = {
+  /* From contracts/PaymentRail.sol
+    struct Invoice {
+        bytes32 id;
+        address tokenAddr;
+        uint amount;
+        address merchantAddr;
+        uint deadline;
+    }
+  */
+    Invoice: [
+      { name: "id", type: "bytes32"},
+      { name: "tokenAddr", type: "address"},
+      { name: "amount", type: "uint256"},
+      { name: "merchantAddr", type: "address"},
+      { name: "deadline", type: "uint256"},
+    ]
+  }
+
   const domain = {
     name: "app",
     version: "1",
     chainId: REAL_NETWORK,
     verifyingContract: await gateway.getAddress(),
   }
-  //function pay(bytes32 invoiceId, address tokenAddr, uint amount, address merchantAddr, uint deadline, bytes32 signature) external {
-  const types = {
-    Pay: [
-      { name: "invoiceId", type: "bytes32"},
-      { name: "tokenAddr", type: "address"},
-      { name: "amount", type: "uint"},
-      { name: "merchantAddr", type: "address"},
-      { name: "deadline", type: "uint"},
-    ]
-  }
   const value = {
-    invoiceId: encodeBytes32String(invoiceId),
+    id: encodeBytes32String(invoiceId),
     tokenAddr: await token.getAddress(),
     amount: amount,
     merchantAddr: await merchant.getAddress(),
-    deadline: Math.floor(Date.now() / 1000) + FIVE_MINUTES
+    deadline: await networkHelpers.time.latest() + FIVE_MINUTES
   }
 
   const hash = ethers.TypedDataEncoder.hash(domain, types, value)
   const signature = await owner.signTypedData(domain, types, value)
-  return {hash, signature, value}
+  return {hash, signature, value, domain}
 }
 
-async function signAndPayOK(
+async function approveAndPay(
   token: MockERC20, 
-  merchant: HardhatEthersSigner, 
   buyer: HardhatEthersSigner,
   gateway: PaymentRail,
+  domain: Record<string, any>, 
   value: Record<string, any>,
   hash: string,
   signature: string
 ) {
   await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT)
   await gateway.connect(buyer).pay(
-    value.invoiceId, 
-    await token.getAddress(),
-    value.amount, 
-    await merchant.getAddress(), 
-    value.deadline,
+    value,
+    domain,
     signature, 
     hash)
 }
@@ -109,11 +116,11 @@ describe("PaymentRail", function () {
   
   it("Transfer exact amount from buyer to merchant", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
-    const {hash, signature, value} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
     expect(await token.balanceOf(merchant.address)).equals(0);
     expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT);
 
-    await signAndPayOK(token, merchant, buyer, gateway, value, hash, signature)
+    await approveAndPay(token, buyer, gateway, domain, value, hash, signature)
 
     expect(await token.balanceOf(merchant.address)).equals(TRANSFER_AMOUNT);
     expect(await token.balanceOf(buyer.address)).equals(0);
@@ -121,10 +128,10 @@ describe("PaymentRail", function () {
 
   it("Contract holds no tokens after payment (non-custodial)", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
-    const {hash, signature, value} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
 
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
-    await signAndPayOK(token, merchant, buyer, gateway, value, hash, signature)
+    await approveAndPay(token, buyer, gateway, domain, value, hash, signature)
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
   })
   

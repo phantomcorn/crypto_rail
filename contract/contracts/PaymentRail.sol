@@ -14,30 +14,51 @@ contract PaymentRail is Ownable {
 
     event PaymentRecieved(bytes32 invoiceId, uint amount, address merchantAddr);
 
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    bytes32 private constant MESSAGE_TYPEHASH = keccak256(
+        "Invoice(bytes32 id,address tokenAddr,uint256 amount,address merchantAddr,uint256 deadline)"
+    );
+    struct Invoice {
+        bytes32 id;
+        address tokenAddr;
+        uint amount;
+        address merchantAddr;
+        uint deadline;
+    }
+    struct EIP712Domain {
+        string name;
+        string version;
+        uint256 chainId;
+        address verifyingContract;
+    }
+
     constructor() Ownable(msg.sender) {}
 
-    function pay(bytes32 invoiceId, address tokenAddr, uint amount, address merchantAddr, uint deadline, bytes memory signature, bytes32 digest) external {
-        require(!hasPaid[invoiceId], "Invoice already paid");
-        require(deadline >= block.timestamp, "Signature expired");
+    function pay(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature, bytes32 digest) external {
+        require(!hasPaid[invoice.id], "Invoice already paid");
+        require(invoice.deadline >= block.timestamp, "Signature expired");
 
-        (uint8 v, bytes32 r, bytes32 s) = extractVRS(signature);
-        address signerAddr = ecrecover(digest, v,r,s);
+        verify(invoice, domain, signature, digest);
 
-        require(signerAddr != address(0), "Invalid signature");
-        require(signerAddr == serverAddr, "Signer must be from real server address");
-
-        hasPaid[invoiceId] = true;
-        IERC20(tokenAddr).transferFrom(msg.sender, merchantAddr, amount);
-        emit PaymentRecieved(invoiceId, amount, merchantAddr);
+        hasPaid[invoice.id] = true;
+        IERC20(invoice.tokenAddr).transferFrom(msg.sender, invoice.merchantAddr, invoice.amount);
+        emit PaymentRecieved(invoice.id, invoice.amount, invoice.merchantAddr);
     }
 
     function setServerAddr(address newServerAddr) external onlyOwner {
+        require(newServerAddr != address(0), "Cannot set zero address");
         serverAddr = newServerAddr;
     }
 
-    function extractVRS(bytes memory signature) internal pure returns(uint8, bytes32, bytes32) {
+    function verify(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature, bytes32 digest) internal view {
+        bytes32 domainSeparator = hashStructDomain(domain);
+        bytes32 computedDigest = keccak256(abi.encodePacked("\x19\x01",domainSeparator,hashStructInvoice(invoice)));
+        require(computedDigest == digest, "Invalid signature (tampered, replay)");
+        
         require(signature.length == 65, "Invalid signature length");
-
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -50,8 +71,34 @@ contract PaymentRail is Ownable {
             s := mload(add(signature, 64))
             v := byte(0, mload(add(signature, 96)))
         }
+        address signerAddr = ecrecover(digest, v,r,s);
+        require(signerAddr != address(0), "Invalid signature (does not match digest)");
+        require(signerAddr == serverAddr, "Signer must be from real server address");
+    }
 
-        return (uint8(v),bytes32(r),bytes32(s));
+    function hashStructInvoice(Invoice memory invoice) internal pure returns(bytes32) {
+        return keccak256(
+            abi.encode(
+                MESSAGE_TYPEHASH,
+                invoice.id,
+                invoice.tokenAddr,
+                invoice.amount,
+                invoice.merchantAddr,
+                invoice.deadline
+            )
+        );
+    }
+
+    function hashStructDomain(EIP712Domain memory domain) internal pure returns(bytes32) {
+        return keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256(bytes(domain.name)),  //"The dynamic values bytes and string are encoded as a keccak256 hash of their contents". Source: https://eips.ethereum.org/EIPS/eip-712
+                keccak256(bytes(domain.version)),
+                domain.chainId,
+                domain.verifyingContract
+            )
+        );
     }
 
 }
