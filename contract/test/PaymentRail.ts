@@ -15,11 +15,9 @@ const TRANSFER_AMOUNT = 30;
 const INVOICE_ID = "32"
 const FIVE_MINUTES = 300
 const TAMPERED_INVOICE_ID = "99"
-const TAMPERED_TOKEN_ADDR = "0xf531B8F309be94191af87605cfbf600d71c2cfe0"
+const TAMPERED_TOKEN_ADDR = "0xf531B8F309be94191af87605cfbf600d71c2cfe0".toLowerCase()
 const TAMPERED_AMOUNT = 99
 const TAMPERD_MERCHANT_ADDR = Wallet.createRandom().address
-const TAMPERED_DEADLINE = await networkHelpers.time.latest() + 99999
-const TAMPERED_DEADLINE_DECREASE = await networkHelpers.time.latest()
 const MALFORMED_SIGNATURE = ""
 
 async function deploySystem() {
@@ -155,6 +153,60 @@ describe("PaymentRail", function () {
     await approveAndPay(token, buyer, gateway, newDomain, newValue, newHash, newSignature)
     expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT)
   })
+
+  it("Succesful transfer emits PaymentRecieved event with correct args", async function () {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    await token.connect(buyer).approve(await gateway.getAddress(), value.amount)
+    await expect(await gateway
+      .connect(buyer)
+      .pay(
+        value,
+        domain,
+        signature, 
+        hash)
+      ).to.emit(gateway, "PaymentRecieved").withArgs(value.id, TRANSFER_AMOUNT, merchant.address)
+  })
+
+  it("An expired signature cannot be used", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    
+    await networkHelpers.time.increase(value.deadline + 1) //expires signature
+    await expect(approveAndPay(token, buyer, gateway, domain, value, hash, signature)).to.revertedWith("Signature expired")
+  })
+
+  it("User cannot pay twice on the same invoice", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT/2, owner, token, merchant, gateway)
+
+    expect(await token.balanceOf(await merchant.getAddress())).equals(0)
+    await approveAndPay(token, buyer, gateway, domain, value, hash, signature)
+    expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT/2)
+    await expect(approveAndPay(token, buyer, gateway, domain, value, hash, signature)).to.be.revertedWith("Invoice already paid")
+  })
+
+  it("Payment at exactly the deadline succeeds", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    
+    expect(await token.balanceOf(merchant.address)).equals(0);
+    expect(await token.balanceOf(buyer.address)).equals(value.amount);
+
+    await token.connect(buyer).approve(await gateway.getAddress(), value.amount) //if current time is t then this gets mined at block t=n+1
+    await networkHelpers.time.setNextBlockTimestamp(value.deadline)
+    await gateway.connect(buyer).pay( //block gets mined at t=value.deadline -> exactly at deadline
+      value,
+      domain,
+      signature, 
+      hash
+    )
+    expect(await networkHelpers.time.latest()).equals(value.deadline) //Current block e.g block that pay lives in is exactly at deadline
+
+    expect(await token.balanceOf(merchant.address)).equals(value.amount);
+    expect(await token.balanceOf(buyer.address)).equals(0);
+  })
+
   it("Insufficient allowance reverts", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
     const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
@@ -178,7 +230,27 @@ describe("PaymentRail", function () {
       signature,
       hash)).to.be.revertedWithCustomError(token,"ERC20InsufficientBalance")
     })
+
+  it("Cannot set signer to zero address", async function() {
+    const {gateway} = await deploySystem()
+    await expect(gateway.setServerAddr(ethers.ZeroAddress)).to.revertedWith("Cannot set zero address")
+  })
+
   it("Failed payment does not mark invoice as paid")
+  it("Tamper with invoiceId invalidates signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const tamperedValue = {...value, id: encodeBytes32String(TAMPERED_INVOICE_ID)}
+
+    await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Invalid signature (tampered, replay)")
+  })
+  it("Tamper with tokenAddr invalidates signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const tamperedValue = {...value, tokenAddr: TAMPERED_TOKEN_ADDR}
+
+    await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Invalid signature (tampered, replay)")
+  })
   it("Tamper with amount invalidates signature", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
     const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
@@ -192,5 +264,26 @@ describe("PaymentRail", function () {
     const tamperedValue = {...value, merchantAddr: TAMPERD_MERCHANT_ADDR}
 
     await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Invalid signature (tampered, replay)")
+  })
+
+  it("Tamper with deadline (increase) invalidates signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway) 
+    //original deadline = t + 300
+    //tampered deadline = t + 300 + 699 = t + 999
+    const tamperedValue = {...value, deadline: value.deadline + 699} 
+    await token.connect(buyer).approve(await gateway.getAddress(), value.amount) //t + 997
+    await expect(gateway.connect(buyer).pay(tamperedValue, domain, signature, hash)).to.be.revertedWith("Invalid signature (tampered, replay)") //t = TAMPERED_DEADLINE - 2
+  })
+
+  it("Tamper with deadline (decrease) will revert with expired signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    //original deadline = t + 300
+    //tampered deadline = t + 300 - 301 = t - 1
+    const tamperedValue = {...value, deadline: value.deadline - 301}
+
+    expect(await networkHelpers.time.latest()).greaterThan(tamperedValue.deadline) //expired signature
+    await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Signature expired")
   })
 });
