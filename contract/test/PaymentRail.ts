@@ -154,6 +154,29 @@ describe("PaymentRail", function () {
     await approveAndPay(token, buyer, gateway, newDomain, newValue, newHash, newSignature)
     expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT)
   })
+  it("Insufficient allowance reverts", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    
+    await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT - 1)
+    await expect(gateway.connect(buyer).pay(
+      value,
+      domain,
+      signature,
+      hash)).to.be.revertedWithCustomError(token, "ERC20InsufficientAllowance")
+  })
+
+  it("Insufficient balance reverts", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT + 1, owner, token, merchant, gateway)
+    expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT)
+    await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT + 1)
+    await expect(gateway.connect(buyer).pay(
+      value,
+      domain,
+      signature,
+      hash)).to.be.revertedWithCustomError(token,"ERC20InsufficientBalance")
+    })
   it("Failed payment does not mark invoice as paid")
   it("Tamper with amount invalidates signature", async function() {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
