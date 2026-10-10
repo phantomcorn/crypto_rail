@@ -1,7 +1,7 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { expect } from "chai";
 import { network } from "hardhat";
-import { keccak256, type TypedDataDomain, type TypedDataField, encodeBytes32String } from "ethers";
+import { Wallet,  encodeBytes32String } from "ethers";
 import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
 import type { MockERC20 } from "../types/ethers-contracts/MockERC20.js";
 
@@ -14,7 +14,12 @@ const FAKE_NETWORK = 11155111
 const TRANSFER_AMOUNT = 30;
 const INVOICE_ID = "32"
 const FIVE_MINUTES = 300
-
+const TAMPERED_INVOICE_ID = "99"
+const TAMPERED_TOKEN_ADDR = "0xf531B8F309be94191af87605cfbf600d71c2cfe0"
+const TAMPERED_AMOUNT = 99
+const TAMPERD_MERCHANT_ADDR = Wallet.createRandom().address
+const TAMPERED_DEALINE = await networkHelpers.time.latest() + 99999
+const MALFORMED_SIGNATURE = ""
 
 async function deploySystem() {
   const [owner, buyer, merchant] = await ethers.getSigners()
@@ -135,23 +140,33 @@ describe("PaymentRail", function () {
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
   })
   
-  it("Same buyer can pay two different invoices")
-  it("Succesful transfer emits PaymentRecieved event with correct args")
-  it("An expired signature cannot be used")
-  it("User cannot pay twice on the same invoice")
-  it("Payment at exactly the deadline succeeds")
-  it("Insufficient allowance reverts")
-  it("Insufficient balance reverts")
-  it("Cannot set signer to zero address")
-  it("Failed payment does not mark invoice as paid")
-  it("Tamper with invoiceId invalidates signature")
-  it("Tamper with tokenAddr invalidates signature")
-  it("Tamper with amount invalidates signature")
-  it("Tamper with merchantAddr invalidates signature")
-  it("Tamper with deadline invalidates signature")
-  it("Cannot validate a signature on a different blockchain network")
+  it("Same buyer can pay two different invoices", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT / 2, owner, token, merchant, gateway)
 
-  it("Malformed signature reverts")
-  it("Signature for another contract cannot be used")
-  it("A valid signature signed by someone else cannot be used to pay")
+    expect(await token.balanceOf(await merchant.getAddress())).equals(0)
+    
+    await approveAndPay(token, buyer, gateway, domain, value, hash, signature)
+    expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT / 2)
+    
+    const {hash: newHash, signature: newSignature, value: newValue, domain: newDomain} = await serverCreateInvoice(INVOICE_ID + 1, TRANSFER_AMOUNT / 2, owner, token, merchant, gateway)
+  
+    await approveAndPay(token, buyer, gateway, newDomain, newValue, newHash, newSignature)
+    expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT)
+  })
+  it("Failed payment does not mark invoice as paid")
+  it("Tamper with amount invalidates signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const tamperedValue = {...value, amount: TAMPERED_AMOUNT}
+
+    await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Invalid signature (tampered, replay)")
+  })
+  it("Tamper with merchantAddr invalidates signature", async function() {
+    const {token, owner, merchant, buyer, gateway} = await deploySystem();
+    const {hash, signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const tamperedValue = {...value, merchantAddr: TAMPERD_MERCHANT_ADDR}
+
+    await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, hash, signature)).to.be.revertedWith("Invalid signature (tampered, replay)")
+  })
 });
