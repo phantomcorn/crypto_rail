@@ -17,4 +17,42 @@ import java.nio.file.Paths;
 
 public class Web3jClient {
 
+    private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
+    private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
+    private static final String CRYPTO_RAIL_ADDRESS = "";
+
+    @Autowired
+    Web3j web3j;
+
+    @Autowired
+    Credentials myCredentials;
+
+    @Bean
+    public Credentials myCredentials() {
+        return Credentials.create(System.getenv("SEPOLIA_PRIVATE_KEY"));
+    }
+
+    @Bean
+    public Web3j web3j() {
+        return Web3j.build(new HttpService(System.getenv("RPC_ENDPOINT_URL")));
+    }
+
+    public String signTypedMesssge(PayRequestDto dto) throws IOException {
+        String jsonMessageString = Files.readString(Paths.get("src/main/resources/static/typedData.json").toAbsolutePath());
+        JsonObject jsonObject = new JsonObject(jsonMessageString);
+
+        jsonObject.getJsonObject("message").put("id", dto.getId());
+        jsonObject.getJsonObject("message").put("tokenAddr", dto.getTokenAddress());
+        jsonObject.getJsonObject("message").put("amount", dto.getAmount());
+        jsonObject.getJsonObject("message").put("merchantAddr", dto.getMerchantAddress());
+        jsonObject.getJsonObject("message").put("deadline",
+                web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().getBlock().getTimestamp()
+                        .add(FIVE_MINUTES));
+
+        jsonObject.getJsonObject("domain").put("chainId", CHAIN_ID);
+        jsonObject.getJsonObject("domain").put("verifyingContract", CRYPTO_RAIL_ADDRESS);
+
+
+        return Sign.signTypedData(jsonObject.toString(), myCredentials.getEcKeyPair()).toString();
+    }
 }

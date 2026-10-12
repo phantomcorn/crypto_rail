@@ -17,6 +17,20 @@ public class MerchantService {
     Web3jClient web3jClient;
 
     public String createInvoice(PayRequestDto dto) throws IOException {
-        return"";
+
+        Invoice newInvoice = invoiceRepository.save(
+                Invoice.builder()
+                .amount(dto.getAmount())
+                .decimal(dto.getDecimal())
+                .merchantAddress(dto.getMerchantAddress())
+                .build()
+        );
+
+        dto.setId(newInvoice.getInvoiceId());
+        dto.setStatus(newInvoice.getStatus());
+
+        //create voucher (signature + data)
+        String voucher = web3jClient.signTypedMesssge(dto);;
+        return voucher;
     }
 }
