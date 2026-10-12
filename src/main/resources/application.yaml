@@ -21,7 +21,7 @@ spring:
           security=DEBUG:
   profile:
     active: dev
-  rpc:
-    endpoint-url: ${RPC_ENDPOINT_URL}
-  sepolia:
-    private-key: ${SEPOLIA_PRIVATE_KEY}
+rpc:
+  endpoint-url: ${RPC_ENDPOINT_URL}
+sepolia:
+  private-key: ${SEPOLIA_PRIVATE_KEY}
