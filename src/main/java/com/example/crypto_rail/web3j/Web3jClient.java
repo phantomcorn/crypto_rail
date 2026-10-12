@@ -4,6 +4,7 @@ import com.example.crypto_rail.dto.PayRequestDto;
 import io.vertx.core.json.JsonObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Sign;
 import org.web3j.protocol.Web3j;
@@ -15,26 +16,20 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+@Service
 public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
     private static final String CRYPTO_RAIL_ADDRESS = "";
 
-    @Autowired
-    Web3j web3j;
+    private final Web3j web3j;
 
-    @Autowired
-    Credentials myCredentials;
+    private final Credentials myCredentials;
 
-    @Bean
-    public Credentials myCredentials() {
-        return Credentials.create(System.getenv("SEPOLIA_PRIVATE_KEY"));
-    }
-
-    @Bean
-    public Web3j web3j() {
-        return Web3j.build(new HttpService(System.getenv("RPC_ENDPOINT_URL")));
+    public Web3jClient(Web3j web3j, Credentials credentials) {
+        this.web3j = web3j;
+        this.myCredentials = credentials;
     }
 
     public String signTypedMesssge(PayRequestDto dto) throws IOException {
