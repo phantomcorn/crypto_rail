@@ -9,7 +9,7 @@ import java.math.BigInteger;
 
 
 @Entity
-@Table(name = "invoices")
+@Table(name = "invoice")
 @Getter @Setter
 @Builder
 public class Invoice {
@@ -25,9 +25,10 @@ public class Invoice {
     @Column(name="amount", precision=64, scale=0)
     BigInteger amount;
 
-    @Column(name="deciaml")
+    @Column(name="decimals")
     Integer decimal;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     Status status = Status.NOT_PAID;
 }
