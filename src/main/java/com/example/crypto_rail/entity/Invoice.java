@@ -31,6 +31,7 @@ public class Invoice {
     Integer decimal;
 
     @Builder.Default
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Enumerated(EnumType.STRING)
     Status status = Status.NOT_PAID;
 }
