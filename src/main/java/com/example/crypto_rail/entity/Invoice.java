@@ -1,9 +1,9 @@
 package com.example.crypto_rail.entity;
 
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigInteger;
 
@@ -11,6 +11,8 @@ import java.math.BigInteger;
 @Entity
 @Table(name = "invoice")
 @Getter @Setter
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class Invoice {
 
