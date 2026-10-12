@@ -19,7 +19,7 @@ public class InvoiceController {
     InvoiceService merchantService;
 
     @PostMapping("/api/pay")
-    public ResponseEntity pay(@RequestBody PayRequest request) throws IOException {
+    public ResponseEntity<String> pay(@RequestBody PayRequest request) throws IOException {
 
         PayRequestDto dto = PayRequestDto.builder()
                 .amount(request.getAmount())
@@ -27,9 +27,9 @@ public class InvoiceController {
                 .merchantAddress(request.getMerchantAddress())
                 .build();
 
-        merchantService.createInvoice(dto);
 
-        return ResponseEntity.ok().build();
+        String voucher = merchantService.createInvoice(dto);
+        return ResponseEntity.ok(voucher);
     }
 
     @GetMapping("/api/hello")

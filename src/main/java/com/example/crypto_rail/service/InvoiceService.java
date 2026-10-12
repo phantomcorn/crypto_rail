@@ -37,7 +37,7 @@ public class InvoiceService {
         dto.setStatus(newInvoice.getStatus());
 
         //create voucher (signature + data)
-        String voucher = web3jClient.signTypedMesssge(dto);;
+        String voucher = web3jClient.signTypedMesssge(dto);
         return voucher;
     }
 }
