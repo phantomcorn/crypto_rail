@@ -17,9 +17,11 @@ import java.math.BigInteger;
 public class Invoice {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name="invoice_id", length=64)
-    String invoiceId;
+    @Column(name="id", length=64)
+    String id;
+
+    @Column(name="hash_id", length=66, nullable = false, unique = true)
+    String hashId;
 
     @Column(name="merchant_address", nullable = false, length = 42)
     String merchantAddress;

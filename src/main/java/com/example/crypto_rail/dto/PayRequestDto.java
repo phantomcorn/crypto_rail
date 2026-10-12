@@ -11,6 +11,7 @@ import java.math.BigInteger;
 public class PayRequestDto {
 
     private String id;
+    private String hashId;
     private BigInteger amount;
     private Integer decimal;
     private String merchantAddress;

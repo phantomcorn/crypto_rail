@@ -21,7 +21,7 @@ public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
-    private static final String CRYPTO_RAIL_ADDRESS = "";
+    private static final String CRYPTO_RAIL_ADDRESS = "0x0000000000000000000000000000000000000001";
 
     private final Web3j web3j;
 
@@ -36,7 +36,7 @@ public class Web3jClient {
         String jsonMessageString = Files.readString(Paths.get("src/main/resources/static/typedData.json").toAbsolutePath());
         JsonObject jsonObject = new JsonObject(jsonMessageString);
 
-        jsonObject.getJsonObject("message").put("id", dto.getId());
+        jsonObject.getJsonObject("message").put("id", dto.getHashId());
         jsonObject.getJsonObject("message").put("tokenAddr", dto.getTokenAddress());
         jsonObject.getJsonObject("message").put("amount", dto.getAmount());
         jsonObject.getJsonObject("message").put("merchantAddr", dto.getMerchantAddress());

@@ -6,8 +6,10 @@ import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.web3j.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.web3j.crypto.Hash;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Service
 public class InvoiceService {
@@ -20,15 +22,18 @@ public class InvoiceService {
 
     public String createInvoice(PayRequestDto dto) throws IOException {
 
+
+        String uuid = UUID.randomUUID().toString();
         Invoice newInvoice = invoiceRepository.save(
                 Invoice.builder()
+                .id(uuid)
+                .hashId(Hash.sha3(uuid))
                 .amount(dto.getAmount())
                 .decimal(dto.getDecimal())
                 .merchantAddress(dto.getMerchantAddress())
                 .build()
         );
 
-        dto.setId(newInvoice.getInvoiceId());
         dto.setStatus(newInvoice.getStatus());
 
         //create voucher (signature + data)
