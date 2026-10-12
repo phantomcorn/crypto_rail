@@ -1,0 +1,31 @@
+{
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"},
+      {"name": "chainId", "type": "uint256"},
+      {"name": "verifyingContract", "type": "address"}
+    ],
+    "Invoice": [
+      { "name": "id", "type": "bytes32"},
+      { "name": "tokenAddr", "type": "address"},
+      { "name": "amount", "type": "uint256"},
+      { "name": "merchantAddr", "type": "address"},
+      { "name": "deadline", "type": "uint256"},
+    ]
+  },
+  "primaryType": "Invoice",
+  "domain": {
+    "name": "CryptoRail",
+    "version": "0.0.1",
+    "chainId": "<network_chain_id>",
+    "verifyingContract": "<server_address>"
+  },
+  "message": {
+    "id": "<invoice_id>",
+    "tokenAddr": "<token_address>",
+    "amount": -1,
+    "merchantAddr": "<merchant_address>",
+    "deadline": -1
+  }
+}
