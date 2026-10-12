@@ -11,7 +11,7 @@
       { "name": "tokenAddr", "type": "address"},
       { "name": "amount", "type": "uint256"},
       { "name": "merchantAddr", "type": "address"},
-      { "name": "deadline", "type": "uint256"},
+      { "name": "deadline", "type": "uint256"}
     ]
   },
   "primaryType": "Invoice",
@@ -19,13 +19,13 @@
     "name": "CryptoRail",
     "version": "0.0.1",
     "chainId": "<network_chain_id>",
-    "verifyingContract": "<server_address>"
+    "verifyingContract": "<contract_address>"
   },
   "message": {
     "id": "<invoice_id>",
     "tokenAddr": "<token_address>",
-    "amount": -1,
+    "amount": "<amount>",
     "merchantAddr": "<merchant_address>",
-    "deadline": -1
+    "deadline": "<deadline>"
   }
 }
