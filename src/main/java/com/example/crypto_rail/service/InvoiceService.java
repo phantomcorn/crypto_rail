@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.web3j.crypto.Hash;
 
 import java.io.IOException;
+import java.math.BigInteger;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -46,5 +48,9 @@ public class InvoiceService {
         String voucher = web3jClient.signTypedMesssge(dto);
         String checkoutUrl = CHECKOUT_BASE_URL + "/checkout/" + dto.getHashId();
         return PayResponse.builder().voucher(voucher).checkoutUrl(checkoutUrl).build();
+    }
+
+    public Optional<Invoice> getInvoiceDetails(String invoiceId) {
+        return invoiceRepository.findByHashId(invoiceId);
     }
 }

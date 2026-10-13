@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+    <html xmlns:th="http://www.thymeleaf.org" >
+    <head>
+        <title>Thymeleaf</title>
+    </head>
+    <body>
+        <form action="/" method="POST">
+            <span>
+                Invoice ID:
+                <div th:text="${invoiceId}"> -1</div>
+            </span>
+            <span>
+                Hash ID:
+                <div th:text="${hashId}"> -1</div>
+            </span>
+            <span>
+                Merchant Address:
+                <div th:text="${merchantAddress}"> 0x0000000000000000000000000000000000000000</div>
+            </span>
+            <span>
+                Token Address:
+                <div th:text="${tokenAddress}"> 0x0000000000000000000000000000000000000000</div>
+            </span>
+            <span>
+                Amount:
+                <div th:text="${amount}">-1</div>
+            </span>
+            <button type="submit">Pay</button>
+        </form>
+    </body>
+</html>
