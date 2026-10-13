@@ -17,7 +17,7 @@ import java.io.IOException;
 public class InvoiceController {
 
     @Autowired
-    InvoiceService merchantService;
+    InvoiceService invoiceService;
 
     @PostMapping("/api/pay")
     public ResponseEntity<PayResponse> pay(@RequestBody PayRequest request) throws IOException {
@@ -29,7 +29,7 @@ public class InvoiceController {
                 .build();
 
 
-        PayResponse resp = merchantService.createInvoice(dto);
+        PayResponse resp = invoiceService.createInvoice(dto);
         return ResponseEntity.ok(resp);
     }
 
