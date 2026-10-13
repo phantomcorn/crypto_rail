@@ -25,3 +25,4 @@ rpc:
   endpoint-url: ${RPC_ENDPOINT_URL}
 sepolia:
   private-key: ${SEPOLIA_PRIVATE_KEY}
+checkout-base-url: ${CHECKOUT_BASE_URL:http://localhost:8080}
