@@ -19,7 +19,7 @@ public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
-    private static final String CRYPTO_RAIL_ADDRESS = "0x0000000000000000000000000000000000000001";
+    private static final String CRYPTO_RAIL_ADDRESS = "0x46ACcbc000e0144deE00C4910bCF6841424F8937";
 
     private final Web3j web3j;
 
