@@ -2,6 +2,7 @@ package com.example.crypto_rail.controller;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.request.PayRequest;
+import com.example.crypto_rail.response.PayResponse;
 import com.example.crypto_rail.service.InvoiceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,7 @@ public class InvoiceController {
     InvoiceService merchantService;
 
     @PostMapping("/api/pay")
-    public ResponseEntity<String> pay(@RequestBody PayRequest request) throws IOException {
+    public ResponseEntity<PayResponse> pay(@RequestBody PayRequest request) throws IOException {
 
         PayRequestDto dto = PayRequestDto.builder()
                 .amount(request.getAmount())
@@ -28,8 +29,8 @@ public class InvoiceController {
                 .build();
 
 
-        String voucher = merchantService.createInvoice(dto);
-        return ResponseEntity.ok(voucher);
+        PayResponse resp = merchantService.createInvoice(dto);
+        return ResponseEntity.ok(resp);
     }
 
     @GetMapping("/api/hello")
