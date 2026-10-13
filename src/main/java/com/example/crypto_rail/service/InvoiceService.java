@@ -31,10 +31,11 @@ public class InvoiceService {
         Invoice newInvoice = invoiceRepository.save(
                 Invoice.builder()
                 .id(uuid)
-                .hashId(Hash.sha3(uuid))
+                .hashId(Hash.sha3String(uuid))
                 .amount(dto.getAmount())
                 .decimal(dto.getDecimal())
                 .merchantAddress(dto.getMerchantAddress())
+                .tokenAddress(dto.getTokenAddress())
                 .build()
         );
 

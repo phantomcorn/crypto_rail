@@ -26,6 +26,9 @@ public class Invoice {
     @Column(name="merchant_address", nullable = false, length = 42)
     String merchantAddress;
 
+    @Column(name="token_address", nullable = false, length = 42)
+    String tokenAddress;
+
     @Column(name="amount", precision=64, scale=0)
     BigInteger amount;
 

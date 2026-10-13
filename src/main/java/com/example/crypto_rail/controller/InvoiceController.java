@@ -26,6 +26,7 @@ public class InvoiceController {
                 .amount(request.getAmount())
                 .decimal(request.getDecimal())
                 .merchantAddress(request.getMerchantAddress())
+                .tokenAddress(request.getTokenAddress())
                 .build();
 
 
