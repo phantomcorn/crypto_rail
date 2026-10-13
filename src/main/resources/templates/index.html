@@ -3,8 +3,16 @@
     <html xmlns:th="http://www.thymeleaf.org" >
     <head>
         <title>Thymeleaf</title>
+        <script th:src="@{/js/wallet.js}" defer></script>
     </head>
     <body>
+
+        <!-- Trigger Button -->
+        <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
+
+        <!-- Status Display -->
+        <p id="walletAddress">Not connected</p>
+
         <form action="/" method="POST">
             <span>
                 Invoice ID:
