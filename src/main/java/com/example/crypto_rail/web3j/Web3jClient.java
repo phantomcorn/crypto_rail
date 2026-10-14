@@ -2,6 +2,7 @@ package com.example.crypto_rail.web3j;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import io.vertx.core.json.JsonObject;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Sign;
@@ -19,7 +20,7 @@ public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
-    private static final String CRYPTO_RAIL_ADDRESS = "0x46ACcbc000e0144deE00C4910bCF6841424F8937";
+    public static final String CRYPTO_RAIL_ADDRESS = "0x46ACcbc000e0144deE00C4910bCF6841424F8937";
 
     private final Web3j web3j;
 
@@ -30,17 +31,16 @@ public class Web3jClient {
         this.myCredentials = credentials;
     }
 
-    public String signTypedMesssge(PayRequestDto dto) throws IOException {
+    public NewSignature signTypedMesssge(PayRequestDto dto) throws IOException {
         String jsonMessageString = Files.readString(Paths.get("src/main/resources/static/typedData.json").toAbsolutePath());
         JsonObject jsonObject = new JsonObject(jsonMessageString);
-
+        BigInteger deadline = web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().getBlock().getTimestamp()
+                .add(FIVE_MINUTES);
         jsonObject.getJsonObject("message").put("id", dto.getHashId());
         jsonObject.getJsonObject("message").put("tokenAddr", dto.getTokenAddress());
         jsonObject.getJsonObject("message").put("amount", dto.getAmount());
         jsonObject.getJsonObject("message").put("merchantAddr", dto.getMerchantAddress());
-        jsonObject.getJsonObject("message").put("deadline",
-                web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().getBlock().getTimestamp()
-                        .add(FIVE_MINUTES));
+        jsonObject.getJsonObject("message").put("deadline", deadline);
 
         jsonObject.getJsonObject("domain").put("chainId", CHAIN_ID);
         jsonObject.getJsonObject("domain").put("verifyingContract", CRYPTO_RAIL_ADDRESS);
@@ -56,6 +56,6 @@ public class Web3jClient {
         System.arraycopy(s, 0, signatureBytes, 32, 32);
         System.arraycopy(v, 0, signatureBytes, 64, 1);
 
-        return Numeric.toHexString(signatureBytes);
+        return new NewSignature(Numeric.toHexString(signatureBytes), deadline);
     }
 }
