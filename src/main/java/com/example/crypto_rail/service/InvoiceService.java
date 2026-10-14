@@ -4,7 +4,9 @@ import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.response.PayResponse;
+import com.example.crypto_rail.web3j.NewSignature;
 import com.example.crypto_rail.web3j.Web3jClient;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -32,25 +34,31 @@ public class InvoiceService {
         String uuid = UUID.randomUUID().toString();
         Invoice newInvoice = invoiceRepository.save(
                 Invoice.builder()
-                .id(uuid)
-                .hashId(Hash.sha3String(uuid))
-                .amount(dto.getAmount())
-                .decimal(dto.getDecimal())
-                .merchantAddress(dto.getMerchantAddress())
-                .tokenAddress(dto.getTokenAddress())
-                .build()
+                        .id(uuid)
+                        .hashId(Hash.sha3String(uuid))
+                        .amount(dto.getAmount())
+                        .decimal(dto.getDecimal())
+                        .merchantAddress(dto.getMerchantAddress())
+                        .tokenAddress(dto.getTokenAddress())
+                        .build()
         );
 
         dto.setHashId(newInvoice.getHashId());
         dto.setStatus(newInvoice.getStatus());
 
         //create voucher (signature + data)
-        String voucher = web3jClient.signTypedMesssge(dto);
+        NewSignature voucher = web3jClient.signTypedMesssge(dto);
+
+        newInvoice.setSignature(voucher.signature());
+        newInvoice.setSignatureExpiresAt(voucher.deadline());
+        invoiceRepository.save(newInvoice);
+
         String checkoutUrl = CHECKOUT_BASE_URL + "/checkout/" + dto.getHashId();
-        return PayResponse.builder().voucher(voucher).checkoutUrl(checkoutUrl).build();
+        return new PayResponse(checkoutUrl);
     }
 
     public Optional<Invoice> getInvoiceDetails(String invoiceId) {
         return invoiceRepository.findByHashId(invoiceId);
     }
+
 }

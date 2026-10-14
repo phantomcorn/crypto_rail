@@ -32,6 +32,12 @@ public class Invoice {
     @Column(name="amount", precision=64, scale=0)
     BigInteger amount;
 
+    @Column(name="signature", nullable = false)
+    String signature;
+
+    @Column(name="signature_expires_at", precision=64, scale=0)
+    BigInteger signatureExpiresAt;
+
     @Column(name="decimals")
     Integer decimal;
 
