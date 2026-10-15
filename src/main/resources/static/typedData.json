@@ -16,8 +16,8 @@
   },
   "primaryType": "Invoice",
   "domain": {
-    "name": "CryptoRail",
-    "version": "0.0.1",
+    "name": "<app_name>",
+    "version": "<version_number>",
     "chainId": "<network_chain_id>",
     "verifyingContract": "<contract_address>"
   },

@@ -2,7 +2,6 @@ package com.example.crypto_rail.web3j;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import io.vertx.core.json.JsonObject;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Sign;
@@ -19,8 +18,10 @@ import java.nio.file.Paths;
 public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
-    private static final BigInteger CHAIN_ID = BigInteger.valueOf(11155111);
+    public static final Long CHAIN_ID = 11155111L;
+    public static final String APP_NAME = "CryptoRail";
     public static final String CRYPTO_RAIL_ADDRESS = "0x46ACcbc000e0144deE00C4910bCF6841424F8937";
+    public static final String APP_VERSION = "0.0.1";
 
     private final Web3j web3j;
 
@@ -42,6 +43,8 @@ public class Web3jClient {
         jsonObject.getJsonObject("message").put("merchantAddr", dto.getMerchantAddress());
         jsonObject.getJsonObject("message").put("deadline", deadline);
 
+        jsonObject.getJsonObject("domain").put("app", APP_NAME);
+        jsonObject.getJsonObject("domain").put("version", APP_VERSION);
         jsonObject.getJsonObject("domain").put("chainId", CHAIN_ID);
         jsonObject.getJsonObject("domain").put("verifyingContract", CRYPTO_RAIL_ADDRESS);
 
