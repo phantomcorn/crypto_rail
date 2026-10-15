@@ -52,9 +52,6 @@ public class Invoice {
     @Column(name="signature_expires_at", precision=64, scale=0)
     BigInteger signatureExpiresAt;
 
-    @Column(name="decimals")
-    Integer decimal;
-
     @Builder.Default
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Enumerated(EnumType.STRING)

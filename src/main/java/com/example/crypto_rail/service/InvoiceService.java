@@ -40,7 +40,6 @@ public class InvoiceService {
                         .name(Web3jClient.APP_NAME)
                         .version(Web3jClient.APP_VERSION)
                         .chainId(Web3jClient.CHAIN_ID)
-                        .decimal(dto.getDecimal())
                         .build()
         );
 

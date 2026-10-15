@@ -8,7 +8,6 @@ import java.math.BigInteger;
 public class PayRequest {
 
     private BigInteger amount;
-    private Integer decimal;
     private String merchantAddress;
     private String tokenAddress;
 

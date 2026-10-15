@@ -33,7 +33,6 @@ public class InvoiceController {
 
         PayRequestDto dto = PayRequestDto.builder()
                 .amount(request.getAmount())
-                .decimal(request.getDecimal())
                 .merchantAddress(request.getMerchantAddress())
                 .tokenAddress(request.getTokenAddress())
                 .build();
