@@ -5,6 +5,7 @@ import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.request.PayRequest;
 import com.example.crypto_rail.response.PayResponse;
 import com.example.crypto_rail.service.InvoiceService;
+import com.example.crypto_rail.web3j.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -20,6 +21,9 @@ import java.util.Optional;
 
 @Controller
 public class InvoiceController {
+
+    public record MessageView(String invoiceId, String hashId, String tokenAddress, String amount, String merchantAddress){};
+    public record DomainView(String name, String version, String chainId, String verifyingContract){};
 
     @Autowired
     InvoiceService invoiceService;
@@ -50,17 +54,25 @@ public class InvoiceController {
         Optional<Invoice> invoiceObj = invoiceService.getInvoiceDetails(invoiceId);
         if (invoiceObj.isPresent()) {
             Invoice invoice = invoiceObj.get();
-            model.addAttribute("invoiceId", invoice.getId());
-            model.addAttribute("hashId", invoice.getHashId());
-            model.addAttribute("tokenAddress", invoice.getTokenAddress());
-            if (invoice.getDecimal() > 0) {
-                model.addAttribute("amount", invoice.getAmount().divide(BigInteger.valueOf(invoice.getDecimal())));
-            } else {
-                model.addAttribute("amount", invoice.getAmount());
-            }
-            model.addAttribute("merchantAddress", invoice.getMerchantAddress());
-        }
 
+            model.addAttribute("domain", new DomainView(
+                    invoice.getName(),
+                    invoice.getVersion(),
+                    invoice.getChainId().toString(),
+                    Web3jClient.CRYPTO_RAIL_ADDRESS
+            ));
+
+            model.addAttribute("message", new MessageView(
+                    invoice.getId(),
+                    invoice.getHashId(),
+                    invoice.getTokenAddress(),
+                    invoice.getAmount().toString(),
+                    invoice.getMerchantAddress()
+            ));
+
+            model.addAttribute("voucher", invoice.getSignature());
+            model.addAttribute("deadline", invoice.getSignatureExpiresAt());
+        }
 
         return "index.html"; //src/main/resources/templates/index.html (Thymeleaf default path)
     }

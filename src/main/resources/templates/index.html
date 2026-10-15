@@ -4,37 +4,47 @@
     <head>
         <title>Thymeleaf</title>
         <script th:src="@{/js/wallet.js}" defer></script>
+        <script type="module">
+
+        </script>
     </head>
     <body>
-
+        <input type="hidden" id="contract_address" th:value="${contractAddress}">
         <!-- Trigger Button -->
         <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
 
         <!-- Status Display -->
         <p id="walletAddress">Not connected</p>
 
-        <form action="/" method="POST">
-            <span>
-                Invoice ID:
-                <div th:text="${invoiceId}"> -1</div>
-            </span>
-            <span>
-                Hash ID:
-                <div th:text="${hashId}"> -1</div>
-            </span>
-            <span>
-                Merchant Address:
-                <div th:text="${merchantAddress}"> 0x0000000000000000000000000000000000000000</div>
-            </span>
-            <span>
-                Token Address:
-                <div th:text="${tokenAddress}"> 0x0000000000000000000000000000000000000000</div>
-            </span>
-            <span>
-                Amount:
-                <div th:text="${amount}">-1</div>
-            </span>
-            <button type="submit">Pay</button>
-        </form>
+        <span>
+            Invoice ID:
+            <div th:text="${message.invoiceId}"> -1</div>
+        </span>
+        <span>
+            Hash ID:
+            <div th:text="${message.hashId}"> -1</div>
+        </span>
+        <span>
+            Merchant Address:
+            <div th:text="${message.merchantAddress}"> 0x0000000000000000000000000000000000000000</div>
+        </span>
+        <span>
+            Token Address:
+            <div th:text="${message.tokenAddress}"> 0x0000000000000000000000000000000000000000</div>
+        </span>
+        <span>
+            Amount:
+            <div th:text="${message.amount}">-1</div>
+        </span>
+        <span>
+            Voucher:
+            <div th:text="${voucher}"> 0x0000000000000000000000000000000000000000</div>
+        </span>
+        <span>
+            Expires at:
+            <div th:text="${deadline}"> 0x0000000000000000000000000000000000000000</div>
+        </span>
+        <button onclick="">Pay</button>
+
     </body>
 </html>
