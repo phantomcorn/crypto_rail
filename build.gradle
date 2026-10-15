@@ -42,3 +42,13 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+def artifactsDir = "${rootDir}/contract/artifacts/contracts"
+
+tasks.named('processResources') {
+    // served at /abi/PaymentRail.json (for the checkout page JS)
+    from("${artifactsDir}/PaymentRail.sol") {
+        include 'PaymentRail.json'
+        into 'static/abi'
+    }
+}
