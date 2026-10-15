@@ -11,18 +11,59 @@
             console.log("Import ethers module...Success!")
             console.log("Import ABI from contract...Success!")
             const abi = abiJson["abi"]
+            const erc20Abi = [
+              "function name() view returns (string)",
+              "function symbol() view returns (string)",
+              "function decimals() view returns (uint8)",
+              "function totalSupply() view returns (uint256)",
+              "function balanceOf(address owner) view returns (uint256)",
+              "function transfer(address to, uint256 amount) returns (bool)",
+              "function allowance(address owner, address spender) view returns (uint256)",
+              "function approve(address spender, uint256 amount) returns (bool)",
+              "function transferFrom(address from, address to, uint256 amount) returns (bool)",
+              "event Transfer(address indexed from, address indexed to, uint256 value)",
+              "event Approval(address indexed owner, address indexed spender, uint256 value)"
+            ];
+
             async function pay() {
                 console.log("User ether version: " + ethers.version)
                 const domain = [[${domain}]]
-                const message = [[${message}]]
+                const message = {
+                    id: [[${message.hashId}]],
+                    tokenAddr: [[${message.tokenAddress}]],
+                    amount: [[${message.amount}]],
+                    merchantAddr: [[${message.merchantAddress}]],
+                    deadline:  [[${deadline}]]
+                }
+
+                const contractAddress = [[${domain.verifyingContract}]]
+                const tokenAddress = [[${message.tokenAddress}]]
+                const amount = [[${message.amount}]]
+                const signature = [[${voucher}]]
+
+
                 const provider = new ethers.BrowserProvider(window.ethereum)
-                const contractAddress = domain.verifyingContract
-                const signer = await provider.getSigner()
-                const contract = new ethers.Contract(contractAddress, abi, signer)
+                const buyer = await provider.getSigner()
+                const buyerAddress = await buyer.getAddress()
+                const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, buyer)
+                const gatewayContract = new ethers.Contract(contractAddress, abi, buyer)
+
+                if ((await tokenContract.allowance(buyerAddress,contractAddress)) < amount) {
+                    const approveTx = await tokenContract.approve(contractAddress, amount)
+                    const approveReceipt = await approveTx.wait()
+                }
+                console.log("Approval ok")
 
 
-                console.log(domain)
-                console.log(message)
+                const tx = await gatewayContract.pay(message, domain, signature)
+                const receipt = await tx.wait()
+                if (receipt.status == 0) {
+                    console.log("Transaction reverted")
+                }
+
+                document.getElementById("status").value = "PAID";
+                document.getElementById("pay-button").disabled = true;
+
             }
             document.getElementById("pay-button").addEventListener("click", pay);
         </script>
@@ -64,6 +105,8 @@
             <div th:text="${deadline}"> 0x0000000000000000000000000000000000000000</div>
         </span>
         <button id="pay-button">Pay</button>
+
+        <div id="status">NOT PAID</div>
 
     </body>
 </html>
