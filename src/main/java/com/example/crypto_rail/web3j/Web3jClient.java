@@ -43,7 +43,7 @@ public class Web3jClient {
         jsonObject.getJsonObject("message").put("merchantAddr", dto.getMerchantAddress());
         jsonObject.getJsonObject("message").put("deadline", deadline);
 
-        jsonObject.getJsonObject("domain").put("app", APP_NAME);
+        jsonObject.getJsonObject("domain").put("name", APP_NAME);
         jsonObject.getJsonObject("domain").put("version", APP_VERSION);
         jsonObject.getJsonObject("domain").put("chainId", CHAIN_ID);
         jsonObject.getJsonObject("domain").put("verifyingContract", CRYPTO_RAIL_ADDRESS);
