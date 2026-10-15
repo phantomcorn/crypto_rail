@@ -6,14 +6,12 @@ import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.response.PayResponse;
 import com.example.crypto_rail.web3j.NewSignature;
 import com.example.crypto_rail.web3j.Web3jClient;
-import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Hash;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,10 +34,13 @@ public class InvoiceService {
                 Invoice.builder()
                         .id(uuid)
                         .hashId(Hash.sha3String(uuid))
-                        .amount(dto.getAmount())
-                        .decimal(dto.getDecimal())
                         .merchantAddress(dto.getMerchantAddress())
                         .tokenAddress(dto.getTokenAddress())
+                        .amount(dto.getAmount())
+                        .name(Web3jClient.APP_NAME)
+                        .version(Web3jClient.APP_VERSION)
+                        .chainId(Web3jClient.CHAIN_ID)
+                        .decimal(dto.getDecimal())
                         .build()
         );
 
