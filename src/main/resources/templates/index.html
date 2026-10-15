@@ -4,12 +4,31 @@
     <head>
         <title>Thymeleaf</title>
         <script th:src="@{/js/wallet.js}" defer></script>
-        <script type="module">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.17.0/ethers.umd.min.js"></script>
+        <script type="module" th:inline="javascript">
+            import abiJson from "./../abi/PaymentRail.json" with { type: "json" };
 
+            console.log("Import ethers module...Success!")
+            console.log("Import ABI from contract...Success!")
+            const abi = abiJson["abi"]
+            async function pay() {
+                console.log("User ether version: " + ethers.version)
+                const domain = [[${domain}]]
+                const message = [[${message}]]
+                const provider = new ethers.BrowserProvider(window.ethereum)
+                const contractAddress = domain.verifyingContract
+                const signer = await provider.getSigner()
+                const contract = new ethers.Contract(contractAddress, abi, signer)
+
+
+                console.log(domain)
+                console.log(message)
+            }
+            document.getElementById("pay-button").addEventListener("click", pay);
         </script>
+
     </head>
     <body>
-        <input type="hidden" id="contract_address" th:value="${contractAddress}">
         <!-- Trigger Button -->
         <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
 
@@ -44,7 +63,7 @@
             Expires at:
             <div th:text="${deadline}"> 0x0000000000000000000000000000000000000000</div>
         </span>
-        <button onclick="">Pay</button>
+        <button id="pay-button">Pay</button>
 
     </body>
 </html>
