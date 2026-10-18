@@ -147,7 +147,7 @@ describe("PaymentRail", function () {
     expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT)
   })
 
-  it("Succesful transfer emits PaymentRecieved event with correct args", async function () {
+  it("Succesful transfer emits PaymentReceived event with correct args", async function () {
     const {token, owner, merchant, buyer, gateway} = await deploySystem();
     const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
     await token.connect(buyer).approve(await gateway.getAddress(), value.amount)
@@ -157,7 +157,7 @@ describe("PaymentRail", function () {
         value,
         domain,
         signature)
-      ).to.emit(gateway, "PaymentRecieved").withArgs(value.id)
+      ).to.emit(gateway, "PaymentReceived").withArgs(value.id)
   })
 
   it("An expired signature cannot be used", async function() {

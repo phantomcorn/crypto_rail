@@ -12,7 +12,7 @@ contract PaymentRail is Ownable {
     address public serverAddr;
     mapping(bytes32 => bool) private hasPaid;
 
-    event PaymentRecieved(bytes32 indexed invoiceId);
+    event PaymentReceived(bytes32 indexed invoiceId);
 
     bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -45,7 +45,7 @@ contract PaymentRail is Ownable {
 
         hasPaid[invoice.id] = true;
         IERC20(invoice.tokenAddr).transferFrom(msg.sender, invoice.merchantAddr, invoice.amount);
-        emit PaymentRecieved(invoice.id);
+        emit PaymentReceived(invoice.id);
     }
 
     function setServerAddr(address newServerAddr) external onlyOwner {
