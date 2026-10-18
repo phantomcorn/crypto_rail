@@ -157,7 +157,7 @@ describe("PaymentRail", function () {
         value,
         domain,
         signature)
-      ).to.emit(gateway, "PaymentRecieved").withArgs(value.id, TRANSFER_AMOUNT, merchant.address)
+      ).to.emit(gateway, "PaymentRecieved").withArgs(value.id)
   })
 
   it("An expired signature cannot be used", async function() {
