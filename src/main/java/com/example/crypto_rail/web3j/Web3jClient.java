@@ -37,7 +37,7 @@ public class Web3jClient {
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     public static final Long CHAIN_ID = 11155111L;
     public static final String APP_NAME = "CryptoRail";
-    public static final String CRYPTO_RAIL_ADDRESS = "0xd361aDb138F0fc54b127d5c1d14ce78Cf4EbFc09";
+    public static final String CRYPTO_RAIL_ADDRESS = "0xd0F29Ad5DC15a44df7461D16C125cfd809150F19";
     public static final String APP_VERSION = "0.0.1";
     public static final String EVENT = "PaymentReceived(bytes32)";
 
