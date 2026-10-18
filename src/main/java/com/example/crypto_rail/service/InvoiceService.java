@@ -2,6 +2,7 @@ package com.example.crypto_rail.service;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.Invoice;
+import com.example.crypto_rail.entity.Status;
 import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.response.PayResponse;
 import com.example.crypto_rail.web3j.NewSignature;
@@ -60,5 +61,19 @@ public class InvoiceService {
     public Optional<Invoice> getInvoiceDetails(String invoiceId) {
         return invoiceRepository.findByHashId(invoiceId);
     }
+
+    public boolean detectPayment(String hashId) {
+        Optional<Invoice> invoiceObj = invoiceRepository.findByHashId(hashId);
+        if (invoiceObj.isEmpty()) {
+           return false;
+        }
+
+        Invoice invoice = invoiceObj.get();
+        invoice.setStatus(Status.DETECTED);
+        invoiceRepository.save(invoice);
+
+        return true;
+    }
+
 
 }
