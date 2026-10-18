@@ -10,7 +10,7 @@ import java.math.BigInteger;
 
 
 @Entity
-@Table(name = "invoice")
+@Table(name = "invoices")
 @Getter @Setter
 @AllArgsConstructor
 @NoArgsConstructor

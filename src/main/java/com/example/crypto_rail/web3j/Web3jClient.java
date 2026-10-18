@@ -2,7 +2,7 @@ package com.example.crypto_rail.web3j;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.service.InvoiceService;
-import com.example.crypto_rail.service.ProcessedService;
+import com.example.crypto_rail.service.InvoicePaymentService;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
@@ -55,7 +55,7 @@ public class Web3jClient {
     InvoiceService invoiceService;
 
     @Autowired
-    ProcessedService processedService;
+    InvoicePaymentService invoicePaymentService;
 
     public Web3jClient() throws URISyntaxException, ConnectException {
         WebSocketClient webSocketClient = new WebSocketClient(new URI("wss://eth-sepolia.g.alchemy.com/v2/alch_dC-N1oQkucc4aRmNyBCf9"));
@@ -106,7 +106,7 @@ public class Web3jClient {
                     //log not found invoice id
                 }
                 //log update status to DETECTED
-                processedService.process(invoiceHashId, newBlock.getNumber(), newBlock.getHash());
+                invoicePaymentService.process(invoiceHashId, newBlock.getNumber(), newBlock.getHash());
                 System.out.println(invoiceHashId + " -> DETECTED");
             }
         }
