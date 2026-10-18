@@ -1,9 +1,12 @@
 package com.example.crypto_rail.web3j;
 
 import com.example.crypto_rail.dto.PayRequestDto;
+import com.example.crypto_rail.service.InvoiceService;
+import com.example.crypto_rail.service.ProcessedService;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
@@ -14,6 +17,7 @@ import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
+import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.websocket.WebSocketClient;
 import org.web3j.protocol.websocket.WebSocketService;
 import org.web3j.protocol.websocket.events.NewHead;
@@ -28,8 +32,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.*;
 
 @Service
 public class Web3jClient {
@@ -41,14 +44,20 @@ public class Web3jClient {
     public static final String APP_VERSION = "0.0.1";
     public static final String EVENT = "PaymentReceived(bytes32)";
 
-    private final Web3j web3j;
+    private final Integer BLOCKS_TO_FINALITY = 12;
+    private final Deque<ProcessedBlock> processedBlock = new ArrayDeque<>();
+    private Disposable disposable;
 
-    private final Credentials myCredentials;
+    @Autowired
+    Web3j web3j;
 
-    public Web3jClient(Web3j web3j, Credentials credentials) throws URISyntaxException, ConnectException {
-        this.web3j = web3j;
-        this.myCredentials = credentials;
+    @Autowired
+    InvoiceService invoiceService;
 
+    @Autowired
+    ProcessedService processedService;
+
+    public Web3jClient() throws URISyntaxException, ConnectException {
         WebSocketClient webSocketClient = new WebSocketClient(new URI("wss://eth-sepolia.g.alchemy.com/v2/alch_dC-N1oQkucc4aRmNyBCf9"));
         WebSocketService webSocketService = new WebSocketService(webSocketClient, false);
         webSocketService.connect();
@@ -70,9 +79,7 @@ public class Web3jClient {
                 NewHeadsNotification.class
         );
 
-        Disposable disposable = notification.subscribe(this::handler);
-
-
+        disposable = notification.subscribe(this::handler);
     }
 
     private void handler(NewHeadsNotification notification) throws IOException {
@@ -88,12 +95,44 @@ public class Web3jClient {
                 new EthFilter(newBlock.getHash(), CRYPTO_RAIL_ADDRESS).addSingleTopic(topic0)
         ).send();
 
-        for (EthLog.LogResult result : ethLog.getLogs()) {
-
+        //Find all PaymentReceived(hash_id) emitted in this new block
+        for (EthLog.LogResult<?> result : ethLog.getLogs()) {
+            if (result instanceof Log) {
+                Log log = (Log) result.get();
+                List<String> topics = log.getTopics();
+                assert topics.size() == 2; //topic0 will always be keccack of function signature, topic1 always be first indexed argument see: https://www.alchemy.com/docs/deep-dive-into-eth_getlogs#deciphering-the-response
+                String invoiceHashId = topics.get(1);
+                if (!invoiceService.detectPayment(invoiceHashId)) {
+                    //log not found invoice id
+                }
+                //log update status to DETECTED
+                processedService.process(invoiceHashId, newBlock.getNumber(), newBlock.getHash());
+                System.out.println(invoiceHashId + " -> DETECTED");
+            }
         }
+
+        //Find any invoice that can be considered final
+
+
+        //Mark this block as processed
+        processedBlock.addLast(new ProcessedBlock(newBlock.getNumber(), newBlock.getHash()));
     }
 
-    public NewSignature signTypedMesssge(PayRequestDto dto) throws IOException {
+    private boolean isReorg(NewHead newHead) {
+        // [B] <- [A]
+        // Make sure newHead's parent hash points to block B (i.e last processed block)
+        if (processedBlock.isEmpty()) {
+            return false;
+        }
+        ProcessedBlock prevBlock = processedBlock.getLast();
+        return newHead.getParentHash().equals(prevBlock.blockHash());
+    }
+
+
+
+
+
+    public static NewSignature signTypedMesssge(Web3j web3j, Credentials credentials, PayRequestDto dto) throws IOException {
         String jsonMessageString = Files.readString(Paths.get("src/main/resources/static/typedData.json").toAbsolutePath());
         JsonObject jsonObject = new JsonObject(jsonMessageString);
         BigInteger deadline = web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().getBlock().getTimestamp()
@@ -109,7 +148,7 @@ public class Web3jClient {
         jsonObject.getJsonObject("domain").put("chainId", CHAIN_ID);
         jsonObject.getJsonObject("domain").put("verifyingContract", CRYPTO_RAIL_ADDRESS);
 
-        Sign.SignatureData signatureData = Sign.signTypedData(jsonObject.toString(), myCredentials.getEcKeyPair());
+        Sign.SignatureData signatureData = Sign.signTypedData(jsonObject.toString(), credentials.getEcKeyPair());
         byte[] r = signatureData.getR();
         byte[] s = signatureData.getS();
         byte[] v = signatureData.getV();

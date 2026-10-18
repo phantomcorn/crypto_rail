@@ -10,7 +10,9 @@ import com.example.crypto_rail.web3j.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
+import org.web3j.protocol.Web3j;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -23,7 +25,10 @@ public class InvoiceService {
     InvoiceRepository invoiceRepository;
 
     @Autowired
-    Web3jClient web3jClient;
+    Web3j web3j;
+
+    @Autowired
+    Credentials credentials;
 
     @Value("${checkout-base-url}")
     private String CHECKOUT_BASE_URL;
@@ -48,7 +53,7 @@ public class InvoiceService {
         dto.setStatus(newInvoice.getStatus());
 
         //create voucher (signature + data)
-        NewSignature voucher = web3jClient.signTypedMesssge(dto);
+        NewSignature voucher = Web3jClient.signTypedMesssge(web3j, credentials, dto);
 
         newInvoice.setSignature(voucher.signature());
         newInvoice.setSignatureExpiresAt(voucher.deadline());
