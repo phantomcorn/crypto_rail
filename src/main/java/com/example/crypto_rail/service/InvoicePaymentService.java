@@ -11,7 +11,7 @@ public class InvoicePaymentService {
     @Autowired
     InvoicePaymentRepository invoicePaymentRepository;
 
-    public void process(String invoiceHashId, String blockNumber, String blockHash) {
+    public void process(String invoiceHashId, BigInteger blockNumber, String blockHash) {
         invoicePaymentRepository.save(
                 InvoicePayment.builder()
                         .invoiceHashId(invoiceHashId)
