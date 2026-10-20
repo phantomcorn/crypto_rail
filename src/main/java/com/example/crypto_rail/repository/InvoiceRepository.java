@@ -12,5 +12,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, String> {
 
     List<Invoice> findByMerchantAddress(String merchantAddress);
     Optional<Invoice> findByHashId(String hashId);
+    List<Invoice> findAllByHashIdIn(List<String> hashIds);
 }
 

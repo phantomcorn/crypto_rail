@@ -15,6 +15,7 @@ import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -81,4 +82,14 @@ public class InvoiceService {
     }
 
 
+    public void toFinality(List<String> hashIds) {
+        List<Invoice> invoiceToFinalize = invoiceRepository.findAllByHashIdIn(hashIds);
+        invoiceToFinalize.forEach(invoice -> {
+                invoice.setStatus(Status.CONFIRMED);
+            }
+        );
+        invoiceRepository.saveAll(invoiceToFinalize);
+
+        //TODO: return webhook to merchant server
+    }
 }

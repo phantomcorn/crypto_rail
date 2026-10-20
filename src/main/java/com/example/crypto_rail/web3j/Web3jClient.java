@@ -1,6 +1,7 @@
 package com.example.crypto_rail.web3j;
 
 import com.example.crypto_rail.dto.PayRequestDto;
+import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.service.InvoicePaymentService;
 import io.reactivex.Flowable;
@@ -42,9 +43,8 @@ public class Web3jClient {
     public static final String APP_NAME = "CryptoRail";
     public static final String CRYPTO_RAIL_ADDRESS = "0xd0F29Ad5DC15a44df7461D16C125cfd809150F19";
     public static final String APP_VERSION = "0.0.1";
-    public static final String EVENT = "PaymentReceived(bytes32)";
+    public static final String topic0 = Hash.sha3String("PaymentReceived(bytes32)");
 
-    private final Integer BLOCKS_TO_FINALITY = 12;
     private final Deque<ProcessedBlock> processedBlock = new ArrayDeque<>();
     private Disposable disposable;
 
@@ -84,11 +84,11 @@ public class Web3jClient {
 
     private void handler(NewHeadsNotification notification) throws IOException {
         NewHead newBlock = notification.getParams().getResult();
-
-        String topic0 = Numeric.toHexString(Hash.sha3(EVENT).getBytes());
+        BigInteger newBlockNumber = Numeric.toBigInt(newBlock.getNumber());
+        String topic0 = Hash.sha3String(EVENT);
         boolean exists = Bloom.test(newBlock.getLogsBloom(), CRYPTO_RAIL_ADDRESS, topic0);
         if (!exists) {
-            return;
+            System.out.println("Skipping " + newBlockNumber);
         }
 
         EthLog ethLog = web3j.ethGetLogs(
@@ -106,13 +106,14 @@ public class Web3jClient {
                     //log not found invoice id
                 }
                 //log update status to DETECTED
-                invoicePaymentService.process(invoiceHashId, newBlock.getNumber(), newBlock.getHash());
-                System.out.println(invoiceHashId + " -> DETECTED");
+                invoicePaymentService.process(invoiceHashId, newBlockNumber, newBlock.getHash());
+                System.out.println("Invoice " + invoiceHashId + " -> DETECTED");
             }
         }
 
-        //Find any invoice that can be considered final
-
+        //Find every invoice that can be marked finalized
+        List<InvoicePayment> payments = invoicePaymentService.canFinalize(newBlockNumber);
+        invoiceService.toFinality(payments.stream().map(InvoicePayment::getInvoiceHashId).toList());
 
         //Mark this block as processed
         processedBlock.addLast(new ProcessedBlock(newBlock.getNumber(), newBlock.getHash()));
