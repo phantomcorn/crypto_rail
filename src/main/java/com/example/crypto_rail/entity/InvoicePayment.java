@@ -1,10 +1,7 @@
 package com.example.crypto_rail.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigInteger;
 
@@ -12,6 +9,7 @@ import java.math.BigInteger;
 @Entity
 @Builder
 @AllArgsConstructor
+@NoArgsConstructor
 @Getter @Setter
 public class InvoicePayment {
 
