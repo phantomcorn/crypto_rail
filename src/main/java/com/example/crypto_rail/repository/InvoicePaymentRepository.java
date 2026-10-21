@@ -13,4 +13,5 @@ public interface InvoicePaymentRepository extends JpaRepository<InvoicePayment, 
 
     @NativeQuery("SELECT i.* FROM invoice_payments i WHERE ?1 - i.block_number >= ?2")
     List<InvoicePayment> findFinalizedPayment(BigInteger blockNumber, BigInteger blockToFinality);
+    List<InvoicePayment> findByBlockNumberBetween(BigInteger from, BigInteger to);
 }
