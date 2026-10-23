@@ -137,7 +137,7 @@ public class Web3jClient {
             return false;
         }
         ProcessedBlock prevBlock = processedBlock.getLast();
-        return newHead.getParentHash().equals(prevBlock.blockHash());
+        return !newHead.getParentHash().equals(prevBlock.blockHash());
     }
 
     private void handleReorg(NewHead head) throws IOException {
