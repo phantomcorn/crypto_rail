@@ -5,7 +5,7 @@ import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.request.PayRequest;
 import com.example.crypto_rail.response.PayResponse;
 import com.example.crypto_rail.service.InvoiceService;
-import com.example.crypto_rail.web3j.Web3jClient;
+import com.example.crypto_rail.utils.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.Optional;
 
 @Controller

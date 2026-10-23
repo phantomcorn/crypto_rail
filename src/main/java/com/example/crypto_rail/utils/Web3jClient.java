@@ -1,21 +1,26 @@
-package com.example.crypto_rail.web3j;
+package com.example.crypto_rail.utils;
 
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.service.InvoicePaymentService;
+import com.example.crypto_rail.utils.dto.NewSignature;
+import com.example.crypto_rail.utils.dto.ProcessedBlock;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
 import org.web3j.crypto.Sign;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.methods.request.EthFilter;
+import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.core.methods.response.Log;
@@ -34,7 +39,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Stream;
 
+@Slf4j
 @Service
 public class Web3jClient {
 
@@ -85,7 +92,11 @@ public class Web3jClient {
     private void handler(NewHeadsNotification notification) throws IOException {
         NewHead newBlock = notification.getParams().getResult();
         BigInteger newBlockNumber = Numeric.toBigInt(newBlock.getNumber());
-        String topic0 = Hash.sha3String(EVENT);
+
+        if (isReorg(newBlock)) {
+            handleReorg(newBlock);
+        }
+
         boolean exists = Bloom.test(newBlock.getLogsBloom(), CRYPTO_RAIL_ADDRESS, topic0);
         if (!exists) {
             System.out.println("Skipping " + newBlockNumber);
@@ -127,6 +138,80 @@ public class Web3jClient {
         }
         ProcessedBlock prevBlock = processedBlock.getLast();
         return newHead.getParentHash().equals(prevBlock.blockHash());
+    }
+
+    private void handleReorg(NewHead head) throws IOException {
+
+
+        ProcessedBlock commonBlock = commonAncestor(head);
+
+        //Sweep starting from p to latest block
+        Stream<EthLog.LogResult> logResults = web3j.ethGetLogs(
+                new EthFilter(
+                        DefaultBlockParameter.valueOf(commonBlock.blockNumber()),
+                        DefaultBlockParameterName.LATEST,
+                        CRYPTO_RAIL_ADDRESS
+                ).addSingleTopic(topic0)
+        ).send().getLogs().stream().filter(
+                result -> {
+                    if (result instanceof Log) {
+                        Log log = (Log) result.get();
+                        List<String> topics = log.getTopics();
+                        return topics.size() == 2; //topic0 will always be keccack of function signature, topic1 always be first indexed argument see: https://www.alchemy.com/docs/deep-dive-into-eth_getlogs#deciphering-the-response
+
+                    }
+                    return false;
+                }
+        );
+
+        if (logResults.findAny().isEmpty()) {
+            //TODO:
+        }
+
+
+        List<String> hashIdsOnReorgBlocks = logResults.map(result -> ((Log) result).getTopics().get(1)).toList();
+        BigInteger to = logResults
+                .map(r -> ((Log) r.get()).getBlockNumber())
+                .max(Comparator.naturalOrder()).get();
+        List<String> hashIdsInPayment = invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()),to);
+
+        /*
+        We have two list ids hashIdsOnReorgBlocks and hashIdsInPayment. We need to process them based on their intersection
+
+        Predicate:
+          - All CONFIRMED invoice should never get reorg
+          - Any invoice already in hashIdsInPayment are DETECTED/REORG/CONFIRMED
+          - Any hashIdsOnReorgBlocks not in hashIdsInPayment are new and should be considered a new payment -> new InvoicePayment
+          - Any hashIdsInPayment not in hashIdsOnReorgBlocks are reorged
+          - In both -> REORG but still included therefore no change
+         */
+
+
+
+
+
+
+
+
+    }
+
+    private ProcessedBlock commonAncestor(NewHead head) throws IOException {
+        //We find the common block number between head and p first
+        ProcessedBlock p = processedBlock.removeLast();
+        BigInteger commonNumber = Numeric.toBigInt(p.blockNumber()).min(Numeric.toBigInt(head.getNumber()));
+        //pop all processed block having block number greater than the common number
+        while (commonNumber.compareTo(Numeric.toBigInt(p.blockNumber())) < 0) {
+            p = processedBlock.removeLast();
+        }
+        EthBlock.Block q = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(commonNumber), false).send().getBlock();
+
+        while(!p.blockHash().equals(q.getHash())) {
+            p = processedBlock.removeLast();
+            q = web3j.ethGetBlockByHash(q.getParentHash(),false).send().getBlock();
+        }
+
+        assert(p.blockNumber().equals(q.getNumber().toString()) && p.blockHash().equals(q.getHash()));
+        return p;
     }
 
 

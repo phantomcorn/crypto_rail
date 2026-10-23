@@ -1,4 +1,4 @@
-package com.example.crypto_rail.web3j;
+package com.example.crypto_rail.utils.dto;
 
 import java.math.BigInteger;
 
