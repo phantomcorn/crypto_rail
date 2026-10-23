@@ -146,13 +146,15 @@ public class Web3jClient {
         ProcessedBlock commonBlock = commonAncestor(head);
 
         //Sweep starting from p to latest block
-        Stream<EthLog.LogResult> logResults = web3j.ethGetLogs(
+        List<EthLog.LogResult> logResults = web3j.ethGetLogs(
                 new EthFilter(
-                        DefaultBlockParameter.valueOf(commonBlock.blockNumber()),
+                        DefaultBlockParameter.valueOf(Numeric.toBigInt(commonBlock.blockNumber())),
                         DefaultBlockParameterName.LATEST,
                         CRYPTO_RAIL_ADDRESS
                 ).addSingleTopic(topic0)
-        ).send().getLogs().stream().filter(
+        ).send().getLogs();
+
+        List<EthLog.LogResult> filteredLogResults = logResults.stream().filter(
                 result -> {
                     if (result instanceof Log) {
                         Log log = (Log) result.get();
@@ -162,18 +164,23 @@ public class Web3jClient {
                     }
                     return false;
                 }
-        );
+        ).toList();
 
-        if (logResults.findAny().isEmpty()) {
-            //TODO:
+        if (filteredLogResults.stream().findAny().isEmpty()) {
+            //TODO: No invoice Id found (topic1) found
         }
 
 
-        List<String> hashIdsOnReorgBlocks = logResults.map(result -> ((Log) result).getTopics().get(1)).toList();
-        BigInteger to = logResults
-                .map(r -> ((Log) r.get()).getBlockNumber())
-                .max(Comparator.naturalOrder()).get();
-        List<String> hashIdsInPayment = invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()),to);
+        List<String> hashIdsOnReorgBlocks = logResults.stream().map(result -> ((Log) result).getTopics().get(1)).toList();
+        Optional<BigInteger> to = logResults.stream().map( logResult -> ((Log) logResult.get()).getBlockNumber()).reduce(
+                (acc, log) -> acc.compareTo(log) > 0 ? acc : log
+        );
+
+        if (to.isEmpty()) {
+            return;
+        }
+
+        List<String> hashIdsInPayment = invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()),to.get());
 
         /*
         We have two list ids hashIdsOnReorgBlocks and hashIdsInPayment. We need to process them based on their intersection
