@@ -61,7 +61,9 @@
                     console.log("Transaction reverted")
                 }
 
-                document.getElementById("status").value = "PAID";
+                console.log(receipt)
+
+                document.getElementById("status").innerHTML = `PAID ${receipt.blockNumber}`;
                 document.getElementById("pay-button").disabled = true;
 
             }
