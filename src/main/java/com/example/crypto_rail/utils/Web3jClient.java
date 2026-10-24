@@ -5,7 +5,7 @@ import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.service.InvoicePaymentService;
 import com.example.crypto_rail.utils.dto.NewSignature;
-import com.example.crypto_rail.utils.dto.ProcessedBlock;
+import com.example.crypto_rail.utils.dto.BlockDto;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
@@ -52,7 +52,7 @@ public class Web3jClient {
     public static final String APP_VERSION = "0.0.1";
     public static final String topic0 = Hash.sha3String("PaymentReceived(bytes32)");
 
-    private final Deque<ProcessedBlock> processedBlock = new ArrayDeque<>();
+    private final Deque<BlockDto> processedBlock = new ArrayDeque<>();
     private Disposable disposable;
 
     @Autowired
@@ -128,7 +128,7 @@ public class Web3jClient {
         invoiceService.toFinality(payments.stream().map(InvoicePayment::getInvoiceHashId).toList());
 
         //Mark this block as processed
-        processedBlock.addLast(new ProcessedBlock(newBlock.getNumber(), newBlock.getHash()));
+        processedBlock.addLast(new BlockDto(newBlock.getNumber(), newBlock.getHash()));
     }
 
     private boolean isReorg(NewHead newHead) {
@@ -137,14 +137,14 @@ public class Web3jClient {
         if (processedBlock.isEmpty()) {
             return false;
         }
-        ProcessedBlock prevBlock = processedBlock.getLast();
+        BlockDto prevBlock = processedBlock.getLast();
         return !newHead.getParentHash().equals(prevBlock.blockHash());
     }
 
     private void handleReorg(NewHead head) throws IOException {
 
 
-        ProcessedBlock commonBlock = commonAncestor(head);
+        BlockDto commonBlock = commonAncestor(head);
 
         //Sweep starting from p to latest block
         List<EthLog.LogResult> logResults = web3j.ethGetLogs(
@@ -224,9 +224,9 @@ public class Web3jClient {
 
     }
 
-    private ProcessedBlock commonAncestor(NewHead head) throws IOException {
+    private BlockDto commonAncestor(NewHead head) throws IOException {
         //We find the common block number between head and p first
-        ProcessedBlock p = processedBlock.removeLast();
+        BlockDto p = processedBlock.removeLast();
         BigInteger commonNumber = Numeric.toBigInt(p.blockNumber()).min(Numeric.toBigInt(head.getNumber()));
         //pop all processed block having block number greater than the common number
         while (commonNumber.compareTo(Numeric.toBigInt(p.blockNumber())) < 0) {
