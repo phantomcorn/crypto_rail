@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: crypto-rail
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: false
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+    defer-datasource-initialization: true
+  logging:
+    level:
+      org:
+        springframework:
+          security=DEBUG:
+  profile:
+    active: test
+rpc:
+  endpoint-url: "https://eth-sepolia.g.alchemy.com/v2/alch_dC-N1oQkucc4aRmNyBCf9"
+sepolia:
+  private-key: "69995f58e4cb3555ec53d95b7e734009aac1f6b8df14a87e78fece2ae34e3daa"
+checkout-base-url: "http://localhost:8080"
