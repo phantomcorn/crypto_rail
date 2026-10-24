@@ -5,7 +5,7 @@ import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.entity.Status;
 import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.response.PayResponse;
-import com.example.crypto_rail.utils.dto.NewSignature;
+import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,7 +54,7 @@ public class InvoiceService {
         dto.setStatus(newInvoice.getStatus());
 
         //create voucher (signature + data)
-        NewSignature voucher = Web3jClient.signTypedMesssge(web3j, credentials, dto);
+        NewSignatureDto voucher = Web3jClient.signTypedMesssge(web3j, credentials, dto);
 
         newInvoice.setSignature(voucher.signature());
         newInvoice.setSignatureExpiresAt(voucher.deadline());

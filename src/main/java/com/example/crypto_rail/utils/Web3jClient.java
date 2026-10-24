@@ -4,7 +4,7 @@ import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.service.InvoicePaymentService;
-import com.example.crypto_rail.utils.dto.NewSignature;
+import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.dto.BlockDto;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
@@ -247,7 +247,7 @@ public class Web3jClient {
 
 
 
-    public static NewSignature signTypedMesssge(Web3j web3j, Credentials credentials, PayRequestDto dto) throws IOException {
+    public static NewSignatureDto signTypedMesssge(Web3j web3j, Credentials credentials, PayRequestDto dto) throws IOException {
         String jsonMessageString = Files.readString(Paths.get("src/main/resources/static/typedData.json").toAbsolutePath());
         JsonObject jsonObject = new JsonObject(jsonMessageString);
         BigInteger deadline = web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().getBlock().getTimestamp()
@@ -274,6 +274,6 @@ public class Web3jClient {
         System.arraycopy(s, 0, signatureBytes, 32, 32);
         System.arraycopy(v, 0, signatureBytes, 64, 1);
 
-        return new NewSignature(Numeric.toHexString(signatureBytes), deadline);
+        return new NewSignatureDto(Numeric.toHexString(signatureBytes), deadline);
     }
 }
