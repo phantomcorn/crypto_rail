@@ -1,5 +1,6 @@
 package com.example.crypto_rail.entity;
 
+import com.example.crypto_rail.utils.dto.InvoicePaymentDto;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,4 +23,8 @@ public class InvoicePayment {
 
     @Column(name="block_hash", length = 66, nullable = false)
     String blockHash;
+
+    public InvoicePaymentDto toDto() {
+        return new InvoicePaymentDto(this.getInvoiceHashId(), this.getBlockNumber(), this.getBlockHash());
+    }
 }

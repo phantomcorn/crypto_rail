@@ -4,6 +4,7 @@ import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.service.InvoicePaymentService;
+import com.example.crypto_rail.utils.dto.InvoicePaymentDto;
 import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.dto.BlockDto;
 import io.reactivex.Flowable;
@@ -124,8 +125,8 @@ public class Web3jClient {
         }
 
         //Find every invoice that can be marked finalized
-        List<InvoicePayment> payments = invoicePaymentService.canFinalize(newBlockNumber);
-        invoiceService.toFinality(payments.stream().map(InvoicePayment::getInvoiceHashId).toList());
+        List<InvoicePaymentDto> payments = invoicePaymentService.canFinalize(newBlockNumber);
+        invoiceService.toFinality(payments.stream().map(InvoicePaymentDto::invoiceHashId).toList());
 
         //Mark this block as processed
         processedBlock.addLast(new BlockDto(newBlock.getNumber(), newBlock.getHash()));
@@ -171,9 +172,9 @@ public class Web3jClient {
             //TODO: No invoice Id found (topic1) found
         }
 
-        Set<InvoicePayment> paymentOnChain = logResults.stream().map(result -> {
+        Set<InvoicePaymentDto> paymentOnChain = logResults.stream().map(result -> {
             Log log = (Log) result;
-            return new InvoicePayment(log.getTopics().get(1), log.getBlockNumber(), log.getBlockHash());
+            return new InvoicePaymentDto(log.getTopics().get(1), log.getBlockNumber(), log.getBlockHash());
         }).collect(Collectors.toSet());
         Optional<BigInteger> to = logResults.stream().map( logResult -> ((Log) logResult.get()).getBlockNumber()).reduce(
                 (acc, log) -> acc.compareTo(log) > 0 ? acc : log
@@ -183,7 +184,7 @@ public class Web3jClient {
             return;
         }
 
-        Set<InvoicePayment> paymentInDb = new HashSet<>(invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()), to.get()));
+        Set<InvoicePaymentDto> paymentInDb = new HashSet<>(invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()), to.get()));
 
         /*
         We have two list ids hashIdsOnChain and hashIdsInDb. We need to process them based on their intersection
@@ -196,21 +197,21 @@ public class Web3jClient {
           - In both -> REORG but still included therefore no change
          */
 
-        Set<String> hashIdsOnChain = paymentOnChain.stream().map(InvoicePayment::getInvoiceHashId).collect(Collectors.toSet());
-        Set<String> hashIdsInDb = paymentInDb.stream().map(InvoicePayment::getInvoiceHashId).collect(Collectors.toSet());
+        Set<String> hashIdsOnChain = paymentOnChain.stream().map(InvoicePaymentDto::invoiceHashId).collect(Collectors.toSet());
+        Set<String> hashIdsInDb = paymentInDb.stream().map(InvoicePaymentDto::invoiceHashId).collect(Collectors.toSet());
 
-        List<InvoicePayment> stillValidNeedUpdate = paymentOnChain.stream().filter(payment -> hashIdsInDb.contains(payment.getInvoiceHashId())).toList(); //update entry to new block number + hash
-        List<InvoicePayment> newPayments = paymentOnChain.stream().filter(payment -> !hashIdsInDb.contains(payment.getInvoiceHashId())).toList();// Add to invoice_payments table
-        List<InvoicePayment> droppedPayment = paymentInDb.stream().filter(payment -> !hashIdsOnChain.contains(payment.getInvoiceHashId())).toList();// Update invoice status to REORG
+        List<InvoicePaymentDto> stillValidNeedUpdate = paymentOnChain.stream().filter(payment -> hashIdsInDb.contains(payment.invoiceHashId())).toList(); //update entry to new block number + hash
+        List<InvoicePaymentDto> newPayments = paymentOnChain.stream().filter(payment -> !hashIdsInDb.contains(payment.invoiceHashId())).toList();// Add to invoice_payments table
+        List<InvoicePaymentDto> droppedPayment = paymentInDb.stream().filter(payment -> !hashIdsOnChain.contains(payment.invoiceHashId())).toList();// Update invoice status to REORG
 
         //1. update valid payments but modified block number + hash
         invoicePaymentService.saveAll(stillValidNeedUpdate);
         //2. add new payments to table and update status
-        List<String> newHashIds = newPayments.stream().map(InvoicePayment::getInvoiceHashId).toList();
+        List<String> newHashIds = newPayments.stream().map(InvoicePaymentDto::invoiceHashId).toList();
         invoicePaymentService.saveAll(newPayments);
         invoiceService.detectPaymentAll(newHashIds);
         //3. drop payment (Delete payment entry and update status in invoices table)
-        List<String> droppedHashIds = droppedPayment.stream().map(InvoicePayment::getInvoiceHashId).toList();
+        List<String> droppedHashIds = droppedPayment.stream().map(InvoicePaymentDto::invoiceHashId).toList();
         invoicePaymentService.removeAllById(droppedHashIds);
         invoiceService.revertAll(droppedHashIds);
 
