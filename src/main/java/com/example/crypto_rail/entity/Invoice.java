@@ -1,5 +1,6 @@
 package com.example.crypto_rail.entity;
 
+import com.example.crypto_rail.utils.InvoiceListener;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import lombok.*;
@@ -10,6 +11,7 @@ import java.math.BigInteger;
 
 
 @Entity
+@EntityListeners(InvoiceListener.class)
 @Table(name = "invoices")
 @Getter @Setter
 @AllArgsConstructor

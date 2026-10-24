@@ -69,27 +69,49 @@ public class InvoiceService {
     }
 
     public boolean detectPayment(String hashId) {
-        Optional<Invoice> invoiceObj = invoiceRepository.findByHashId(hashId);
-        if (invoiceObj.isEmpty()) {
-           return false;
+        return updateInvoiceStatus(hashId, Status.DETECTED);
+    }
+
+    public boolean detectPaymentAll(List<String> hashIds) { //update all or none
+        List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(hashIds);
+        if (hashIds.size() != foundInvoice.size()) {
+            return false;
         }
-
-        Invoice invoice = invoiceObj.get();
-        invoice.setStatus(Status.DETECTED);
-        invoiceRepository.save(invoice);
-
+        foundInvoice.forEach(invoice -> invoice.setStatus(Status.DETECTED));
+        invoiceRepository.saveAll(foundInvoice);
         return true;
     }
 
-
     public void toFinality(List<String> hashIds) {
         List<Invoice> invoiceToFinalize = invoiceRepository.findAllByHashIdIn(hashIds);
-        invoiceToFinalize.forEach(invoice -> {
-                invoice.setStatus(Status.CONFIRMED);
-            }
-        );
+        invoiceToFinalize.forEach(invoice -> invoice.setStatus(Status.CONFIRMED));
         invoiceRepository.saveAll(invoiceToFinalize);
+    }
 
-        //TODO: return webhook to merchant server
+    private boolean revert(String droppedHashId) {
+        return updateInvoiceStatus(droppedHashId, Status.REORG);
+    }
+
+    public boolean revertAll(List<String> droppedHashIds) {
+        List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(droppedHashIds);
+        if (droppedHashIds.size() != foundInvoice.size()) {
+            return false;
+        }
+        foundInvoice.forEach(invoice -> invoice.setStatus(Status.REORG));
+        invoiceRepository.saveAll(foundInvoice);
+        return true;
+    }
+
+    private boolean updateInvoiceStatus(String hashId, Status newStatus) {
+        Optional<Invoice> invoiceObj = invoiceRepository.findByHashId(hashId);
+        if (invoiceObj.isEmpty()) {
+            return false;
+        }
+
+        Invoice invoice = invoiceObj.get();
+        invoice.setStatus(newStatus);
+        invoiceRepository.save(invoice);
+
+        return true;
     }
 }

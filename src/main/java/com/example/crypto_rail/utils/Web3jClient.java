@@ -39,7 +39,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -92,14 +92,15 @@ public class Web3jClient {
     private void handler(NewHeadsNotification notification) throws IOException {
         NewHead newBlock = notification.getParams().getResult();
         BigInteger newBlockNumber = Numeric.toBigInt(newBlock.getNumber());
-
+        String msg = "";
         if (isReorg(newBlock)) {
             handleReorg(newBlock);
         }
+        msg += "Reorg: False";
 
         boolean exists = Bloom.test(newBlock.getLogsBloom(), CRYPTO_RAIL_ADDRESS, topic0);
         if (!exists) {
-            System.out.println("Skipping " + newBlockNumber);
+            System.out.println("Skipping " + newBlockNumber + " " + msg);
         }
 
         EthLog ethLog = web3j.ethGetLogs(
@@ -170,8 +171,10 @@ public class Web3jClient {
             //TODO: No invoice Id found (topic1) found
         }
 
-
-        List<String> hashIdsOnReorgBlocks = logResults.stream().map(result -> ((Log) result).getTopics().get(1)).toList();
+        Set<InvoicePayment> paymentOnChain = logResults.stream().map(result -> {
+            Log log = (Log) result;
+            return new InvoicePayment(log.getTopics().get(1), log.getBlockNumber(), log.getBlockHash());
+        }).collect(Collectors.toSet());
         Optional<BigInteger> to = logResults.stream().map( logResult -> ((Log) logResult.get()).getBlockNumber()).reduce(
                 (acc, log) -> acc.compareTo(log) > 0 ? acc : log
         );
@@ -180,18 +183,37 @@ public class Web3jClient {
             return;
         }
 
-        List<String> hashIdsInPayment = invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()),to.get());
+        Set<InvoicePayment> paymentInDb = new HashSet<>(invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()), to.get()));
 
         /*
-        We have two list ids hashIdsOnReorgBlocks and hashIdsInPayment. We need to process them based on their intersection
+        We have two list ids hashIdsOnChain and hashIdsInDb. We need to process them based on their intersection
 
         Predicate:
           - All CONFIRMED invoice should never get reorg
-          - Any invoice already in hashIdsInPayment are DETECTED/REORG/CONFIRMED
-          - Any hashIdsOnReorgBlocks not in hashIdsInPayment are new and should be considered a new payment -> new InvoicePayment
-          - Any hashIdsInPayment not in hashIdsOnReorgBlocks are reorged
+          - Any invoice already in hashIdsInDb are DETECTED/REORG/CONFIRMED
+          - Any hashIdsOnReorgBlocks not in hashIdsInDb are new and should be considered a new payment -> new InvoicePayment
+          - Any hashIdsInDb not in hashIdsOnReorgBlocks are reorged
           - In both -> REORG but still included therefore no change
          */
+
+        Set<String> hashIdsOnChain = paymentOnChain.stream().map(InvoicePayment::getInvoiceHashId).collect(Collectors.toSet());
+        Set<String> hashIdsInDb = paymentInDb.stream().map(InvoicePayment::getInvoiceHashId).collect(Collectors.toSet());
+
+        List<InvoicePayment> stillValidNeedUpdate = paymentOnChain.stream().filter(payment -> hashIdsInDb.contains(payment.getInvoiceHashId())).toList(); //update entry to new block number + hash
+        List<InvoicePayment> newPayments = paymentOnChain.stream().filter(payment -> !hashIdsInDb.contains(payment.getInvoiceHashId())).toList();// Add to invoice_payments table
+        List<InvoicePayment> droppedPayment = paymentInDb.stream().filter(payment -> !hashIdsOnChain.contains(payment.getInvoiceHashId())).toList();// Update invoice status to REORG
+
+        //1. update valid payments but modified block number + hash
+        invoicePaymentService.saveAll(stillValidNeedUpdate);
+        //2. add new payments to table and update status
+        List<String> newHashIds = newPayments.stream().map(InvoicePayment::getInvoiceHashId).toList();
+        invoicePaymentService.saveAll(newPayments);
+        invoiceService.detectPaymentAll(newHashIds);
+        //3. drop payment (Delete payment entry and update status in invoices table)
+        List<String> droppedHashIds = droppedPayment.stream().map(InvoicePayment::getInvoiceHashId).toList();
+        invoicePaymentService.removeAllById(droppedHashIds);
+        invoiceService.revertAll(droppedHashIds);
+
 
 
 

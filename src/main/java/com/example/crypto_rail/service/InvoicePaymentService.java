@@ -30,8 +30,16 @@ public class InvoicePaymentService {
         return invoicePaymentRepository.findFinalizedPayment(currentBlockNumber, BigInteger.valueOf(BLOCKS_TO_FINALITY));
     }
 
-    public List<String> getPaymentBetween(BigInteger from, BigInteger to) {
+    public List<InvoicePayment> getPaymentBetween(BigInteger from, BigInteger to) {
         //A reorged happened. Sweeped the new block and found these validHashIds
-        return invoicePaymentRepository.findByBlockNumberBetween(from, to).stream().map(InvoicePayment::getInvoiceHashId).toList();
+        return invoicePaymentRepository.findByBlockNumberBetween(from, to).stream().toList();
+    }
+
+    public void saveAll(List<InvoicePayment> payments) {
+        invoicePaymentRepository.saveAll(payments);
+    }
+
+    public void removeAllById(List<String> droppedHashIds) {
+        invoicePaymentRepository.deleteAllById(droppedHashIds);
     }
 }
