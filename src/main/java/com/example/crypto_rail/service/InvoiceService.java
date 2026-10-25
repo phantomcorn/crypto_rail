@@ -82,10 +82,22 @@ public class InvoiceService {
         return true;
     }
 
-    public void toFinality(List<String> hashIds) {
+    public boolean toFinality(List<String> hashIds) {
         List<Invoice> invoiceToFinalize = invoiceRepository.findAllByHashIdIn(hashIds);
-        invoiceToFinalize.forEach(invoice -> invoice.setStatus(Status.CONFIRMED));
-        invoiceRepository.saveAll(invoiceToFinalize);
+        if (hashIds.size() != invoiceToFinalize.size()) {
+            return false;
+        }
+
+        //only update ones that are in DETECTED
+        List<Invoice> unconfirmedInvoice = invoiceToFinalize
+                .stream().filter(invoice -> invoice.getStatus().equals(Status.DETECTED))
+                .peek(invoice -> invoice.setStatus(Status.CONFIRMED))
+                .toList();
+        if (unconfirmedInvoice.isEmpty()) {
+            return false;
+        }
+        invoiceRepository.saveAllAndFlush(unconfirmedInvoice);
+        return true;
     }
 
     private boolean revert(String droppedHashId) {
