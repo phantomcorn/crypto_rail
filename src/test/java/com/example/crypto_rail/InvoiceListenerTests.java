@@ -64,4 +64,6 @@ public class InvoiceListenerTests {
         Assertions.assertTrue(output.getOut().contains("NOT_PAID -> DETECTED"));
         Assertions.assertEquals(1, invoiceListener.getCalled());
     }
+
+    //TODO: Test webhook sent on (NOT_PAID -> DETECTED) or (DETECTED -> CONFIRMED) or (DETECTED -> REORG)
 }

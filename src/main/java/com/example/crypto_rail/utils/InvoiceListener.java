@@ -44,6 +44,14 @@ public class InvoiceListener implements PostUpdateEventListener {
                 Status oldStatus = (Status) event.getOldState()[index];
                 Status newStatus = (Status) event.getState()[index];
 
+                if (oldStatus.equals(Status.NOT_PAID) && newStatus.equals(Status.DETECTED)) {
+                    //Webhook on block
+                } else if (oldStatus.equals(Status.DETECTED) && newStatus.equals(Status.CONFIRMED)) {
+                    //Webhook confirmed
+                } else if (oldStatus.equals(Status.DETECTED) && newStatus.equals(Status.REORG)) {
+                    //Webhook revert
+                }
+
                 System.out.println(oldStatus + " -> " + newStatus);
 
             }
