@@ -32,25 +32,25 @@ public class Invoice {
     @Column(name="token_address", nullable = false, length = 42)
     String tokenAddress;
 
-    @Column(name="amount", precision=64, scale=0)
+    @Column(name="amount", precision=64, nullable = false)
     BigInteger amount;
 
     /* Domain */
     @Column(name="app_name", length=256, nullable = false)
     String name;
 
-    @Column(name="app_version", length=10)
+    @Column(name="app_version", length=10, nullable = false)
     String version;
 
     @Min(value = 1, message = "Smallest Chain ID is 1")
-    @Column(name="chain_id")
+    @Column(name="chain_id", nullable = false)
     Long chainId;
 
     /* Etc. */
     @Column(name="signature", nullable = false)
     String signature;
 
-    @Column(name="signature_expires_at", precision=64, scale=0)
+    @Column(name="signature_expires_at", precision=64, nullable = false)
     BigInteger signatureExpiresAt;
 
     @Builder.Default

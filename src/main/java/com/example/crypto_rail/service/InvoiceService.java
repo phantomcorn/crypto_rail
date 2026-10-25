@@ -37,21 +37,19 @@ public class InvoiceService {
     public PayResponse createInvoice(PayRequestDto dto) throws IOException {
 
         String uuid = UUID.randomUUID().toString();
-        Invoice newInvoice = invoiceRepository.save(
-                Invoice.builder()
+        dto.setHashId(Hash.sha3String(uuid));
+        dto.setStatus(Status.NOT_PAID);
+        Invoice newInvoice = Invoice.builder()
                         .id(uuid)
-                        .hashId(Hash.sha3String(uuid))
+                        .hashId(dto.getHashId())
                         .merchantAddress(dto.getMerchantAddress())
                         .tokenAddress(dto.getTokenAddress())
                         .amount(dto.getAmount())
                         .name(Web3jClient.APP_NAME)
                         .version(Web3jClient.APP_VERSION)
                         .chainId(Web3jClient.CHAIN_ID)
-                        .build()
-        );
-
-        dto.setHashId(newInvoice.getHashId());
-        dto.setStatus(newInvoice.getStatus());
+                        .status(dto.getStatus())
+                        .build();
 
         //create voucher (signature + data)
         NewSignatureDto voucher = Web3jClient.signTypedMesssge(web3j, credentials, dto);
