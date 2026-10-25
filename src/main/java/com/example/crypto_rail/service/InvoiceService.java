@@ -1,5 +1,6 @@
 package com.example.crypto_rail.service;
 
+import com.example.crypto_rail.dto.InvoiceDto;
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.entity.Status;
@@ -62,8 +63,13 @@ public class InvoiceService {
         return new PayResponse(checkoutUrl);
     }
 
-    public Optional<Invoice> getInvoiceDetails(String invoiceId) {
-        return invoiceRepository.findByHashId(invoiceId);
+    public Optional<InvoiceDto> getInvoiceDetails(String invoiceId) {
+        Optional<Invoice> found = invoiceRepository.findByHashId(invoiceId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(found.get().toDto());
     }
 
     public boolean detectPayment(String hashId) {

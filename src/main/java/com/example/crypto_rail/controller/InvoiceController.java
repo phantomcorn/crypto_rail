@@ -1,5 +1,6 @@
 package com.example.crypto_rail.controller;
 
+import com.example.crypto_rail.dto.InvoiceDto;
 import com.example.crypto_rail.dto.PayRequestDto;
 import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.request.PayRequest;
@@ -49,27 +50,27 @@ public class InvoiceController {
     @GetMapping("/checkout/{invoiceId}")
     public String renderCheckoutPage(Model model, @PathVariable String invoiceId) {
 
-        Optional<Invoice> invoiceObj = invoiceService.getInvoiceDetails(invoiceId);
+        Optional<InvoiceDto> invoiceObj = invoiceService.getInvoiceDetails(invoiceId);
         if (invoiceObj.isPresent()) {
-            Invoice invoice = invoiceObj.get();
+            InvoiceDto invoiceDto = invoiceObj.get();
 
             model.addAttribute("domain", new DomainView(
-                    invoice.getName(),
-                    invoice.getVersion(),
-                    invoice.getChainId().toString(),
+                    invoiceDto.name(),
+                    invoiceDto.version(),
+                    invoiceDto.chainId().toString(),
                     Web3jClient.CRYPTO_RAIL_ADDRESS
             ));
 
             model.addAttribute("message", new MessageView(
-                    invoice.getId(),
-                    invoice.getHashId(),
-                    invoice.getTokenAddress(),
-                    invoice.getAmount().toString(),
-                    invoice.getMerchantAddress()
+                    invoiceDto.id(),
+                    invoiceDto.hashId(),
+                    invoiceDto.tokenAddress(),
+                    invoiceDto.amount().toString(),
+                    invoiceDto.merchantAddress()
             ));
 
-            model.addAttribute("voucher", invoice.getSignature());
-            model.addAttribute("deadline", invoice.getSignatureExpiresAt());
+            model.addAttribute("voucher", invoiceDto.signature());
+            model.addAttribute("deadline", invoiceDto.deadline());
         }
 
         return "index.html"; //src/main/resources/templates/index.html (Thymeleaf default path)

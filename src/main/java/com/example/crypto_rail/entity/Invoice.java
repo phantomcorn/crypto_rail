@@ -1,6 +1,6 @@
 package com.example.crypto_rail.entity;
 
-import com.example.crypto_rail.utils.InvoiceListener;
+import com.example.crypto_rail.dto.InvoiceDto;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import lombok.*;
@@ -57,4 +57,8 @@ public class Invoice {
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Enumerated(EnumType.STRING)
     Status status = Status.NOT_PAID;
+
+    public InvoiceDto toDto() {
+        return new InvoiceDto(id, hashId, merchantAddress, tokenAddress, amount, name, version, chainId, signature, signatureExpiresAt, status);
+    }
 }
