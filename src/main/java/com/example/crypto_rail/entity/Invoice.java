@@ -11,7 +11,6 @@ import java.math.BigInteger;
 
 
 @Entity
-@EntityListeners(InvoiceListener.class)
 @Table(name = "invoices")
 @Getter @Setter
 @AllArgsConstructor
