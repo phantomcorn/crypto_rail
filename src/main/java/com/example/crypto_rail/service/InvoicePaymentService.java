@@ -2,7 +2,7 @@ package com.example.crypto_rail.service;
 
 import com.example.crypto_rail.entity.InvoicePayment;
 import com.example.crypto_rail.repository.InvoicePaymentRepository;
-import com.example.crypto_rail.utils.dto.InvoicePaymentDto;
+import com.example.crypto_rail.dto.InvoicePaymentDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

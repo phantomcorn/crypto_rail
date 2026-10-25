@@ -1,6 +1,6 @@
 package com.example.crypto_rail.entity;
 
-import com.example.crypto_rail.utils.dto.InvoicePaymentDto;
+import com.example.crypto_rail.dto.InvoicePaymentDto;
 import jakarta.persistence.*;
 import lombok.*;
 
