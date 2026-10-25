@@ -1,3 +1,5 @@
 package com.example.crypto_rail.response;
 
-public record PayResponse(String checkoutUrl) {}
+import com.example.crypto_rail.dto.InvoiceDto;
+
+public record PayResponse(String checkoutUrl, InvoiceDto newInvoice) {}

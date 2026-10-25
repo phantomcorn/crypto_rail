@@ -60,7 +60,7 @@ public class InvoiceService {
         invoiceRepository.save(newInvoice);
 
         String checkoutUrl = CHECKOUT_BASE_URL + "/checkout/" + dto.getHashId();
-        return new PayResponse(checkoutUrl);
+        return new PayResponse(checkoutUrl, newInvoice.toDto());
     }
 
     public Optional<InvoiceDto> getInvoiceDetails(String invoiceId) {
