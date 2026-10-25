@@ -45,9 +45,10 @@ public class InvoiceListener implements PostUpdateEventListener {
                 Status newStatus = (Status) event.getState()[index];
 
                 System.out.println(oldStatus + " -> " + newStatus);
-                called+=1;
+
             }
         }
+        called+=1;
     }
 
 }
