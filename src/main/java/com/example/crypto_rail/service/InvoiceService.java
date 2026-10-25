@@ -69,24 +69,35 @@ public class InvoiceService {
     }
 
     public boolean detectPayment(String hashId) {
-        return updateInvoiceStatus(hashId, Status.DETECTED);
-    }
-
-    public boolean detectPaymentAll(List<String> hashIds) { //update all or none
-        List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(hashIds);
-        if (hashIds.size() != foundInvoice.size()) {
+        Optional<Invoice> found = invoiceRepository.findByHashId(hashId);
+        if (found.isEmpty()) {
             return false;
         }
-        foundInvoice.forEach(invoice -> invoice.setStatus(Status.DETECTED));
-        invoiceRepository.saveAll(foundInvoice);
+        Invoice invoice = found.get();
+        if (!invoice.getStatus().equals(Status.NOT_PAID)) {
+            return false;
+        }
+
+        invoice.setStatus(Status.DETECTED);
+        invoiceRepository.save(invoice);
+        return true;
+    }
+
+    public boolean detectPaymentAll(List<String> hashIds) {
+        List<Invoice> invoices = invoiceRepository.findAllByHashIdIn(hashIds);
+        List<Invoice> detectedInvoice = invoices.stream().filter(invoice -> invoice.getStatus().equals(Status.NOT_PAID))
+                .peek(invoice -> invoice.setStatus(Status.DETECTED))
+                .toList();
+
+        if (detectedInvoice.isEmpty()) {
+            return false;
+        }
+        invoiceRepository.saveAllAndFlush(detectedInvoice);
         return true;
     }
 
     public boolean toFinality(List<String> hashIds) {
         List<Invoice> invoiceToFinalize = invoiceRepository.findAllByHashIdIn(hashIds);
-        if (hashIds.size() != invoiceToFinalize.size()) {
-            return false;
-        }
 
         //only update ones that are in DETECTED
         List<Invoice> unconfirmedInvoice = invoiceToFinalize
@@ -100,30 +111,30 @@ public class InvoiceService {
         return true;
     }
 
-    private boolean revert(String droppedHashId) {
-        return updateInvoiceStatus(droppedHashId, Status.REORG);
+    public boolean revert(String droppedHashId) {
+        Optional<Invoice> found = invoiceRepository.findByHashId(droppedHashId);
+        if (found.isEmpty()) {
+            return false;
+        }
+        Invoice invoice = found.get();
+        if (!invoice.getStatus().equals(Status.CONFIRMED)) {
+            return false;
+        }
+        invoice.setStatus(Status.REORG);
+        invoiceRepository.save(invoice);
+        return true;
     }
 
     public boolean revertAll(List<String> droppedHashIds) {
         List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(droppedHashIds);
-        if (droppedHashIds.size() != foundInvoice.size()) {
+        List<Invoice> revertedInvoices = foundInvoice
+                .stream().filter(invoice -> invoice.getStatus().equals(Status.CONFIRMED))
+                .peek(invoice -> invoice.setStatus(Status.REORG))
+                .toList();
+        if (revertedInvoices.isEmpty()) {
             return false;
         }
-        foundInvoice.forEach(invoice -> invoice.setStatus(Status.REORG));
-        invoiceRepository.saveAll(foundInvoice);
-        return true;
-    }
-
-    private boolean updateInvoiceStatus(String hashId, Status newStatus) {
-        Optional<Invoice> invoiceObj = invoiceRepository.findByHashId(hashId);
-        if (invoiceObj.isEmpty()) {
-            return false;
-        }
-
-        Invoice invoice = invoiceObj.get();
-        invoice.setStatus(newStatus);
-        invoiceRepository.save(invoice);
-
+        invoiceRepository.saveAllAndFlush(revertedInvoices);
         return true;
     }
 }
