@@ -121,7 +121,7 @@ public class InvoiceService {
             return false;
         }
         Invoice invoice = found.get();
-        if (!invoice.getStatus().equals(Status.CONFIRMED)) {
+        if (!invoice.getStatus().equals(Status.DETECTED)) {
             return false;
         }
         invoice.setStatus(Status.REORG);
@@ -132,7 +132,7 @@ public class InvoiceService {
     public boolean revertAll(List<String> droppedHashIds) {
         List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(droppedHashIds);
         List<Invoice> revertedInvoices = foundInvoice
-                .stream().filter(invoice -> invoice.getStatus().equals(Status.CONFIRMED))
+                .stream().filter(invoice -> invoice.getStatus().equals(Status.DETECTED))
                 .peek(invoice -> invoice.setStatus(Status.REORG))
                 .toList();
         if (revertedInvoices.isEmpty()) {

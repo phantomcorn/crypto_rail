@@ -141,7 +141,7 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void revertOnExistingInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(CONFIRMED_INVOICE));
+        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
@@ -152,20 +152,20 @@ public class InvoiceServiceUnitTests {
     }
 
     @Test
-    public void revertDoesNotProcessDetectedInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
+    public void revertDoesNotProcessConfirmedInvoiceWillReturnFalse() {
+        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(CONFIRMED_INVOICE));
         Assertions.assertFalse(invoiceService.revert(VALID_HASH_ID));
     }
 
     @Test
     public void revertDoesNotProcessReorgInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(REORG_INVOICE));
         Assertions.assertFalse(invoiceService.revert(VALID_HASH_ID));
     }
 
     @Test
-    public void revertOnlyProcessConfirmedInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(CONFIRMED_INVOICE));
+    public void revertOnlyProcessDetectedInvoiceWillReturnTrue() {
+        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
@@ -220,28 +220,28 @@ public class InvoiceServiceUnitTests {
     }
 
     @Test
-    public void revertAllWithAllConfirmedInvoiceWillReturnTrue() {
+    public void revertAllWithAllDetectedInvoiceWillReturnTrue() {
         List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID);
 
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(CONFIRMED_INVOICE, CONFIRMED_INVOICE));
+        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(DETECTED_INVOICE, DETECTED_INVOICE));
         Assertions.assertTrue(invoiceService.revertAll(allValid));
     }
 
     @Test
-    public void revertAllWithNoConfirmedInvoiceWillReturnFalse() {
+    public void revertAllWithNoDetectedInvoiceWillReturnFalse() {
         List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
 
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, DETECTED_INVOICE, REORG_INVOICE));
+        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, CONFIRMED_INVOICE, REORG_INVOICE));
         Assertions.assertFalse(invoiceService.revertAll(allValid));
     }
 
     @Test
-    public void revertAllWillOnlyUpdateOnConfirmedInvoice() {
+    public void revertAllWillOnlyUpdateOnDetectedInvoice() {
         List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
 
         Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, DETECTED_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
         Assertions.assertTrue(invoiceService.revertAll(allValid));
-        Mockito.verify(invoiceRepository, times(1)).saveAllAndFlush(List.of(CONFIRMED_INVOICE));
+        Mockito.verify(invoiceRepository, times(1)).saveAllAndFlush(List.of(DETECTED_INVOICE));
     }
 
 
