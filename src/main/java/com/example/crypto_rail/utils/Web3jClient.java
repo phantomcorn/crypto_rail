@@ -64,29 +64,9 @@ public class Web3jClient {
     @Autowired
     InvoicePaymentService invoicePaymentService;
 
-    public Web3jClient() throws URISyntaxException, ConnectException {
-        WebSocketClient webSocketClient = new WebSocketClient(new URI("wss://eth-sepolia.g.alchemy.com/v2/alch_dC-N1oQkucc4aRmNyBCf9"));
-        WebSocketService webSocketService = new WebSocketService(webSocketClient, false);
-        webSocketService.connect();
+    public Web3jClient(Web3jClientAdapter adapter) throws URISyntaxException, ConnectException {
 
-        if (!webSocketClient.isOpen()) {
-            return;
-        }
-
-        Request<?, EthSubscribe> subscribeRequest = new Request<>(
-                "eth_subscribe",
-                Arrays.asList("newHeads", Collections.emptyList()),
-                webSocketService,
-                EthSubscribe.class
-        );
-
-        Flowable<NewHeadsNotification> notification = webSocketService.subscribe(
-                subscribeRequest,
-                "eth_unsubscribe",
-                NewHeadsNotification.class
-        );
-
-        disposable = notification.subscribe(this::handler);
+        disposable = adapter.getNotification().subscribe(this::handler);
     }
 
     private void handler(NewHeadsNotification notification) throws IOException {
@@ -131,7 +111,7 @@ public class Web3jClient {
         processedBlock.addLast(new BlockDto(newBlock.getNumber(), newBlock.getHash()));
     }
 
-    private boolean isReorg(NewHead newHead) {
+    public boolean isReorg(NewHead newHead) {
         // [B] <- [A]
         // Make sure newHead's parent hash points to block B (i.e last processed block)
         if (processedBlock.isEmpty()) {
@@ -141,8 +121,7 @@ public class Web3jClient {
         return !newHead.getParentHash().equals(prevBlock.blockHash());
     }
 
-    private void handleReorg(NewHead head) throws IOException {
-
+    public void handleReorg(NewHead head) throws IOException {
 
         BlockDto commonBlock = commonAncestor(head);
 
