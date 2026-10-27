@@ -39,7 +39,7 @@ public class InvoicePaymentServiceIntegrationTests {
 
         Assertions.assertEquals(0, invoicePaymentRepository.findAll().size());
 
-        invoicePaymentService.add(random(66), BigInteger.ONE, random(66));
+        invoicePaymentService.add(new InvoicePaymentDto(random(66), BigInteger.ONE, random(66)));
 
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
     }
@@ -48,11 +48,11 @@ public class InvoicePaymentServiceIntegrationTests {
     public void addDoesNotAddEntryWithDuplicateHashId() {
         String id = random(66);
 
-        invoicePaymentService.add(id, BigInteger.ONE, random(66));
+        invoicePaymentService.add(new InvoicePaymentDto(id, BigInteger.ONE, random(66)));
 
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
 
-        invoicePaymentService.add(id, BigInteger.TWO, random(66));
+        invoicePaymentService.add(new InvoicePaymentDto(id, BigInteger.TWO, random(66)));
 
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
     }
@@ -63,7 +63,7 @@ public class InvoicePaymentServiceIntegrationTests {
 
         int[] BLOCK_NUM = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
         for (int blockNum : BLOCK_NUM) {
-            invoicePaymentService.add(random(66), BigInteger.valueOf(blockNum), random(66));
+            invoicePaymentService.add(new InvoicePaymentDto(random(66), BigInteger.valueOf(blockNum), random(66)));
         }
 
         int currentBlock = BLOCK_NUM[BLOCK_NUM.length - 1]; //18
@@ -82,7 +82,7 @@ public class InvoicePaymentServiceIntegrationTests {
     public void getPaymentBetweenRetrievesDataBetweenRange() {
         int[] ALL_BLOCK_NUM = {1,2,3,4,5,6,7,8,9,10};
         for (int blockNum : ALL_BLOCK_NUM) {
-            invoicePaymentService.add(random(66), BigInteger.valueOf(blockNum), random(66));
+            invoicePaymentService.add(new InvoicePaymentDto(random(66), BigInteger.valueOf(blockNum), random(66)));
         }
 
         BigInteger from = BigInteger.valueOf(5);
@@ -104,7 +104,7 @@ public class InvoicePaymentServiceIntegrationTests {
 
         int repeat = 5;
         for (int i = 0; i < repeat; i++) {
-            invoicePaymentService.add(random(66), BigInteger.valueOf(1), random(66));
+            invoicePaymentService.add(new InvoicePaymentDto(random(66), BigInteger.valueOf(1), random(66)));
         }
 
         payments = invoicePaymentService.getPaymentBetween(BigInteger.ONE,BigInteger.ONE);
