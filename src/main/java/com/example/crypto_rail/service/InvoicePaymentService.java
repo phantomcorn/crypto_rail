@@ -17,14 +17,8 @@ public class InvoicePaymentService {
     @Autowired
     InvoicePaymentRepository invoicePaymentRepository;
 
-    public void add(String invoiceHashId, BigInteger blockNumber, String blockHash) {
-        invoicePaymentRepository.save(
-                InvoicePayment.builder()
-                        .invoiceHashId(invoiceHashId)
-                        .blockNumber(blockNumber)
-                        .blockHash(blockHash)
-                        .build()
-        );
+    public void add(InvoicePaymentDto dto) {
+        invoicePaymentRepository.save(toEntity(dto));
     }
 
     public List<InvoicePaymentDto>canFinalize(BigInteger currentBlockNumber) {
