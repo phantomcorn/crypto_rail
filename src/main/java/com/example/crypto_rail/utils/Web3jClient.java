@@ -118,7 +118,7 @@ public class Web3jClient {
                     //log not found invoice id
                 }
                 //log update status to DETECTED
-                invoicePaymentService.process(invoiceHashId, newBlockNumber, newBlock.getHash());
+                invoicePaymentService.add(invoiceHashId, newBlockNumber, newBlock.getHash());
                 System.out.println("Invoice " + invoiceHashId + " -> DETECTED");
             }
         }
