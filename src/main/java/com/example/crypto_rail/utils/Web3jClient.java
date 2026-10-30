@@ -64,7 +64,7 @@ public class Web3jClient {
     @Autowired
     InvoicePaymentService invoicePaymentService;
 
-    public Web3jClient(Web3jClientAdapter adapter) throws URISyntaxException, ConnectException {
+    public Web3jClient(Web3jClientAdapter adapter) {
 
         disposable = adapter.getNotification().subscribe(this::handler);
     }
@@ -79,29 +79,30 @@ public class Web3jClient {
         msg += "Reorg: False";
 
         boolean exists = Bloom.test(newBlock.getLogsBloom(), CRYPTO_RAIL_ADDRESS, topic0);
-        if (!exists) {
-            System.out.println("Skipping " + newBlockNumber + " " + msg);
-        }
+        if (exists) {
 
-        EthLog ethLog = web3j.ethGetLogs(
-                new EthFilter(newBlock.getHash(), CRYPTO_RAIL_ADDRESS).addSingleTopic(topic0)
-        ).send();
+            EthLog ethLog = web3j.ethGetLogs(
+                    new EthFilter(newBlock.getHash(), CRYPTO_RAIL_ADDRESS).addSingleTopic(topic0)
+            ).send();
 
-        //Find all PaymentReceived(hash_id) emitted in this new block
-        for (EthLog.LogResult<?> result : ethLog.getLogs()) {
-            if (result instanceof Log) {
-                Log log = (Log) result.get();
-                List<String> topics = log.getTopics();
-                assert topics.size() == 2; //topic0 will always be keccack of function signature, topic1 always be first indexed argument see: https://www.alchemy.com/docs/deep-dive-into-eth_getlogs#deciphering-the-response
-                String invoiceHashId = topics.get(1);
-                if (!invoiceService.detectPayment(invoiceHashId)) {
-                    //log not found invoice id
+            //Find all PaymentReceived(hash_id) emitted in this new block
+            for (EthLog.LogResult<?> result : ethLog.getLogs()) {
+                if (result instanceof Log) {
+                    Log log = (Log) result.get();
+                    List<String> topics = log.getTopics();
+                    assert topics.size() == 2; //topic0 will always be keccack of function signature, topic1 always be first indexed argument see: https://www.alchemy.com/docs/deep-dive-into-eth_getlogs#deciphering-the-response
+                    String invoiceHashId = topics.get(1);
+                    if (!invoiceService.detectPayment(invoiceHashId)) {
+                        //log not found invoice id
+                    }
+                    //log update status to DETECTED
+                    invoicePaymentService.add(new InvoicePaymentDto(invoiceHashId, newBlockNumber, newBlock.getHash()));
+                    System.out.println("Invoice " + invoiceHashId + " -> DETECTED");
                 }
-                //log update status to DETECTED
-                invoicePaymentService.add(new InvoicePaymentDto(invoiceHashId, newBlockNumber, newBlock.getHash()));
-                System.out.println("Invoice " + invoiceHashId + " -> DETECTED");
             }
         }
+
+        System.out.println("Skipping " + newBlockNumber + " " + msg);
 
         //Find every invoice that can be marked finalized
         List<InvoicePaymentDto> payments = invoicePaymentService.canFinalize(newBlockNumber);
