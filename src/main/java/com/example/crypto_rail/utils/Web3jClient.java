@@ -24,8 +24,6 @@ import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.core.methods.response.Log;
-import org.web3j.protocol.websocket.WebSocketClient;
-import org.web3j.protocol.websocket.WebSocketService;
 import org.web3j.protocol.websocket.events.NewHead;
 import org.web3j.protocol.websocket.events.NewHeadsNotification;
 import org.web3j.utils.Bloom;
@@ -33,9 +31,6 @@ import org.web3j.utils.Numeric;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.ConnectException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -64,9 +59,8 @@ public class Web3jClient {
     @Autowired
     InvoicePaymentService invoicePaymentService;
 
-    public Web3jClient(Web3jClientAdapter adapter) {
-
-        disposable = adapter.getNotification().subscribe(this::handler);
+    public Web3jClient(@Autowired Web3jClientAdapter adapter) {
+        disposable = adapter.getNotification().subscribe(this::handler, err -> log.error("newHeads subscriber failed", err));
     }
 
     private void handler(NewHeadsNotification notification) throws IOException {
