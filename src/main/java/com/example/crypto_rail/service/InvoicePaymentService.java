@@ -30,6 +30,10 @@ public class InvoicePaymentService {
         return invoicePaymentRepository.findByBlockNumberBetween(from, to).stream().map(InvoicePayment::toDto).toList();
     }
 
+    public List<InvoicePaymentDto> getPaymentFrom(BigInteger from) {
+        return invoicePaymentRepository.findByBlockNumberGreaterThanEqual(from).stream().map(InvoicePayment::toDto).toList();
+    }
+
     public void saveAll(List<InvoicePaymentDto> payments) {
         invoicePaymentRepository.saveAll(
                 payments.stream().map(this::toEntity).toList()
