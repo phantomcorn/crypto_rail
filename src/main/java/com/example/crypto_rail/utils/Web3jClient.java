@@ -6,7 +6,6 @@ import com.example.crypto_rail.service.InvoicePaymentService;
 import com.example.crypto_rail.dto.InvoicePaymentDto;
 import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.dto.BlockDto;
-import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,6 @@ import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthLog;
-import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.websocket.events.NewHead;
 import org.web3j.protocol.websocket.events.NewHeadsNotification;
@@ -68,9 +66,12 @@ public class Web3jClient {
         BigInteger newBlockNumber = Numeric.toBigInt(newBlock.getNumber());
         String msg = "";
         if (isReorg(newBlock)) {
+            msg += "Reorg: True";
             handleReorg(newBlock);
+        } else {
+            msg += "Reorg: False";
         }
-        msg += "Reorg: False";
+
 
         boolean exists = Bloom.test(newBlock.getLogsBloom(), CRYPTO_RAIL_ADDRESS, topic0);
         if (exists) {
@@ -120,15 +121,15 @@ public class Web3jClient {
 
         BlockDto commonBlock = commonAncestor(head);
 
-        //Sweep starting from p to latest block
-        List<EthLog.LogResult> logResults = web3j.ethGetLogs(
-                new EthFilter(
-                        DefaultBlockParameter.valueOf(Numeric.toBigInt(commonBlock.blockNumber())),
-                        DefaultBlockParameterName.LATEST,
-                        CRYPTO_RAIL_ADDRESS
-                ).addSingleTopic(topic0)
-        ).send().getLogs();
 
+        //Sweep starting from p to latest block
+        Request<?, EthLog> request = web3j.ethGetLogs(new EthFilter(
+                DefaultBlockParameter.valueOf(Numeric.toBigInt(commonBlock.blockNumber())),
+                DefaultBlockParameterName.LATEST,
+                CRYPTO_RAIL_ADDRESS
+        ).addSingleTopic(topic0));
+
+        List<EthLog.LogResult> logResults = request.send().getLogs();
         List<EthLog.LogResult> filteredLogResults = logResults.stream().filter(
                 result -> {
                     if (result instanceof Log) {
@@ -141,23 +142,23 @@ public class Web3jClient {
                 }
         ).toList();
 
+        Set<InvoicePaymentDto> paymentInDb = new HashSet<>(invoicePaymentService.getPaymentFrom(Numeric.toBigInt(commonBlock.blockNumber())));
+
         if (filteredLogResults.stream().findAny().isEmpty()) {
-            //TODO: No invoice Id found (topic1) found
+            //No payment on chain, reorg entire payment in DB
+            List<String> droppedHashIds = paymentInDb.stream().map(InvoicePaymentDto::invoiceHashId).toList();
+            invoicePaymentService.removeAllById(droppedHashIds);
+            invoiceService.revertAll(droppedHashIds);
+            return;
         }
 
         Set<InvoicePaymentDto> paymentOnChain = logResults.stream().map(result -> {
             Log log = (Log) result;
             return new InvoicePaymentDto(log.getTopics().get(1), log.getBlockNumber(), log.getBlockHash());
         }).collect(Collectors.toSet());
-        Optional<BigInteger> to = logResults.stream().map( logResult -> ((Log) logResult.get()).getBlockNumber()).reduce(
-                (acc, log) -> acc.compareTo(log) > 0 ? acc : log
-        );
 
-        if (to.isEmpty()) {
-            return;
-        }
 
-        Set<InvoicePaymentDto> paymentInDb = new HashSet<>(invoicePaymentService.getPaymentBetween(Numeric.toBigInt(commonBlock.blockNumber()), to.get()));
+
 
         /*
         We have two list ids hashIdsOnChain and hashIdsInDb. We need to process them based on their intersection
@@ -199,21 +200,25 @@ public class Web3jClient {
     }
 
     private BlockDto commonAncestor(NewHead head) throws IOException {
-        //We find the common block number between head and p first
+        //To reach this point: must always be atleast 1 processed block
+        //ASSUMPTION: NewHead always 1 block greater than last processedBlock number
+        //We find the common block number between forked head and block p
         BlockDto p = processedBlock.removeLast();
-        BigInteger commonNumber = Numeric.toBigInt(p.blockNumber()).min(Numeric.toBigInt(head.getNumber()));
-        //pop all processed block having block number greater than the common number
-        while (commonNumber.compareTo(Numeric.toBigInt(p.blockNumber())) < 0) {
-            p = processedBlock.removeLast();
-        }
-        EthBlock.Block q = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(commonNumber), false).send().getBlock();
+        assert(Numeric.toBigInt(p.blockNumber()).add(BigInteger.ONE).equals(Numeric.toBigInt(head.getNumber())));
+        EthBlock.Block q = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(Numeric.toBigInt(p.blockNumber())), false).send().getBlock();
 
         while(!p.blockHash().equals(q.getHash())) {
+            //if processedBlock is empty => common ancestor becomes the fork common block (q)
+            if (processedBlock.isEmpty()) {
+                return new BlockDto(q.getNumber().toString(), q.getHash());
+            }
             p = processedBlock.removeLast();
             q = web3j.ethGetBlockByHash(q.getParentHash(),false).send().getBlock();
         }
 
-        assert(p.blockNumber().equals(q.getNumber().toString()) && p.blockHash().equals(q.getHash()));
+        System.out.println(Numeric.toBigInt(p.blockNumber()) + "  " + p.blockHash());
+        System.out.println(q.getNumber() + "  " + q.getHash());
+        assert(Numeric.toBigInt(p.blockNumber()).equals(q.getNumber()) && p.blockHash().equals(q.getHash()));
         return p;
     }
 
