@@ -26,8 +26,10 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.Request;
+import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthLog;
+import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.websocket.events.NewHead;
 import org.web3j.protocol.websocket.events.NewHeadsNotification;
 import org.web3j.protocol.websocket.events.NotificationParams;
@@ -37,10 +39,10 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.ConnectException;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -67,47 +69,68 @@ public class Web3jClientIntegrationTests {
     @MockitoSpyBean
     InvoiceService invoiceService;
 
-    public void mockEthGetLogs(NewHead block, List<EthLog.LogResult> logs) throws IOException {
-        Request<?, EthLog> mockReq = mock(Request.class);
-        mockReq.setId(UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE);
-        EthLog mockEthLog = mock(EthLog.class);
+    public void mockEthGetLogs(List<EthLog.LogResult> logs) throws IOException {
 
-        doReturn(mockReq).when(web3j).ethGetLogs(
-                argThat(arg -> {
-                    boolean equalHash = arg.getBlockHash() != null && arg.getBlockHash().equals(block.getHash());
-                    boolean notNull = arg.getFromBlock() != null && arg.getToBlock() != null;
-                    boolean isFromName = arg.getFromBlock() instanceof DefaultBlockParameterName;
-                    boolean isToName = arg.getToBlock() instanceof DefaultBlockParameterName;
-                    boolean inBetween = notNull &&
-                            (
-                                    (!isFromName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getFromBlock().getValue())) >= 0) ||
-                                            (!isToName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getToBlock().getValue())) <= 0)
-                            );
+        doAnswer(inv -> {
+            EthFilter filter = inv.getArgument(0);
+            List<EthLog.LogResult> out = logs;
 
-                    return equalHash || inBetween;
-                })
-        ); //using the when convention causes java to complain using wildcards
-        when(mockReq.send()).thenReturn(mockEthLog);
-        when(mockEthLog.getLogs()).thenReturn(logs);
+            if (filter.getBlockHash() != null) {
+                out = out.stream().filter(logResult -> ((Log) logResult.get()).getBlockHash().equals(filter.getBlockHash())).toList();
+            }
+
+            if (filter.getToBlock() != null && filter.getFromBlock() != null) {
+                out = out.stream().filter(logResult -> {
+                    Log log = (Log) logResult;
+                    boolean lowerBounded = true;
+                    boolean upperBounded = true;
+
+                    if (!filter.getFromBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
+                        BigInteger lowerBound = Numeric.toBigInt(filter.getFromBlock().getValue());
+                        lowerBounded = lowerBound.compareTo(log.getBlockNumber()) <= 0;
+                    }
+
+                    if (filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
+                        BigInteger upperBound = Numeric.toBigInt(filter.getToBlock().getValue());
+                        upperBounded = upperBound.compareTo(log.getBlockNumber()) >= 0;
+                    }
+
+                    return lowerBounded && upperBounded;
+                }).toList();
+            }
+
+            EthLog ethLog = new EthLog();
+            ethLog.setResult(out);
+
+            Request<?, EthLog> request = new Request<>("eth_getLogs", List.of(), null, EthLog.class) { @Override public EthLog send() { return ethLog; } };
+            request.setId(UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE);
+            return request;
+        }).when(web3j).ethGetLogs(any(EthFilter.class));
     }
 
-    public EthLog.LogObject newLogObj(boolean withTopic, String invoiceId) {
+    public EthLog.LogObject newLogObj(NewHead block, boolean withTopic, String invoiceId) {
         EthLog.LogObject logResult = new EthLog.LogObject();
         if (withTopic) {
             logResult.setTopics(List.of(Web3jClient.topic0, invoiceId));
         } else {
             logResult.setTopics(Collections.emptyList());
         }
+        logResult.setBlockHash(block.getHash());
+        logResult.setAddress(Web3jClient.CRYPTO_RAIL_ADDRESS);
+        logResult.setBlockNumber(Numeric.toBigInt(block.getNumber()).toString());
         return logResult;
     }
 
-    public EthLog.LogObject newLogObj(boolean withTopic) {
+    public EthLog.LogObject newLogObj(NewHead block, boolean withTopic) {
         EthLog.LogObject logResult = new EthLog.LogObject();
         if (withTopic) {
             logResult.setTopics(List.of(Web3jClient.topic0, Hash.sha3String(UUID.randomUUID().toString())));
         } else {
             logResult.setTopics(Collections.emptyList());
         }
+        logResult.setBlockHash(block.getHash());
+        logResult.setAddress(Web3jClient.CRYPTO_RAIL_ADDRESS);
+        logResult.setBlockNumber(Numeric.toBigInt(block.getNumber()).toString());
         return logResult;
     }
 
@@ -125,34 +148,40 @@ public class Web3jClientIntegrationTests {
     }
 
     public void mockForkChain() throws IOException {
+        List<EthLog.LogResult> allLogs = new ArrayList<>();
         for (NewHeadsNotification newHeadsNotification : reorgChain) {
             NewHead head = newHeadsNotification.getParams().getResult();
             EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
-                mockEthGetLogs(head, List.of(newLogObj(true)));
+                allLogs.add(newLogObj(head, true));
             } else {
-                mockEthGetLogs(head, List.of(newLogObj(false)));
+                allLogs.add(newLogObj(head, false));
             }
             mockBlockByNumber(block);
             mockBlockByHash(block);
         }
+        mockEthGetLogs(allLogs);
     }
 
     public void mockNormalChain() throws IOException {
+        List<EthLog.LogResult> allLogs = new ArrayList<>();
         for (NewHeadsNotification newHeadsNotification : normalChain) {
             NewHead head = newHeadsNotification.getParams().getResult();
             EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
-                mockEthGetLogs(head, List.of(newLogObj(true)));
+                allLogs.add(newLogObj(head, true));
             } else {
-                mockEthGetLogs(head, List.of(newLogObj(false)));
+                allLogs.add(newLogObj(head, false));
             }
             mockBlockByNumber(block);
             mockBlockByHash(block);
         }
+        mockEthGetLogs(allLogs);
     }
 
     public void mockChain(List<NotificationWithLogs> notificationWithLogs) throws IOException {
+        List<EthLog.LogResult> allLogs = new ArrayList<>();
+
         for (NotificationWithLogs notificationWithLog : notificationWithLogs) {
             List<String> invoiceIds = notificationWithLog.invoiceIds();
             NewHeadsNotification newHeadsNotification = notificationWithLog.notification();
@@ -160,14 +189,18 @@ public class Web3jClientIntegrationTests {
             EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
             assert(Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0) == !invoiceIds.isEmpty());
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
-                List<EthLog.LogResult> results = invoiceIds.stream().map(id -> newLogObj(true, id)).collect(Collectors.toList());
-                mockEthGetLogs(head, results);
+                invoiceIds.forEach(id -> {
+                    allLogs.add(newLogObj(head,true, id));
+                });
             } else {
-                mockEthGetLogs(head, List.of(newLogObj(false)));
+                invoiceIds.forEach(id -> {
+                    allLogs.add(newLogObj(head, false));
+                });
             }
             mockBlockByNumber(block);
             mockBlockByHash(block);
         }
+        mockEthGetLogs(allLogs);
 
     }
 
@@ -249,13 +282,11 @@ public class Web3jClientIntegrationTests {
 
     @Test
     public void aNewBlockWithTopicCanFindMultipleTopicLogs() throws IOException {
-        EthLog.LogObject logResult1 = newLogObj(true);
-        EthLog.LogObject logResult2 = newLogObj(true);
-
-
         NewHeadsNotification notification = normalChain.get(1);
         NewHead block = notification.getParams().getResult();
-        mockEthGetLogs(block, List.of(logResult1, logResult2));
+        EthLog.LogObject logResult1 = newLogObj(block, true);
+        EthLog.LogObject logResult2 = newLogObj(block, true);
+        mockEthGetLogs(List.of(logResult1, logResult2));
 
         newHeadPublisher.onNext(notification);
         verify(invoicePaymentService).add(new InvoicePaymentDto(
@@ -272,10 +303,10 @@ public class Web3jClientIntegrationTests {
 
     @Test
     public void aNewBlockWithTopicWillAlwaysCheckForPaymentsToFinalize() throws IOException {
-        EthLog.LogObject logResult = newLogObj(true);
         NewHeadsNotification notificationWithTopic = normalChain.get(1);
         NewHead blockWithTopic = notificationWithTopic.getParams().getResult();
-        mockEthGetLogs(blockWithTopic, List.of(logResult));
+        EthLog.LogObject logResult = newLogObj(blockWithTopic, true);
+        mockEthGetLogs(List.of(logResult));
         newHeadPublisher.onNext(notificationWithTopic);
         verify(invoicePaymentService).canFinalize(Numeric.toBigInt(blockWithTopic.getNumber()));
     }
@@ -307,7 +338,7 @@ public class Web3jClientIntegrationTests {
     @Test
     public void canDetectReorg() throws IOException {
         newHeadPublisher.onNext(normalChain.get(0));
-        mockEthGetLogs(normalChain.get(1).getParams().getResult(), List.of(newLogObj(true)));
+        mockEthGetLogs(List.of(newLogObj(normalChain.get(1).getParams().getResult(), true)));
         newHeadPublisher.onNext(normalChain.get(1));
         newHeadPublisher.onNext(normalChain.get(2));
         newHeadPublisher.onNext(normalChain.get(3));
@@ -382,12 +413,4 @@ public class Web3jClientIntegrationTests {
             Assertions.assertEquals(expectedBlock.getHash(), resp.getHash());
         }
     }
-
-//    List<Throwable> errors = new ArrayList<>();
-//
-//    @BeforeEach
-//    void captureRxErrors() { RxJavaPlugins.setErrorHandler(errors::add); }
-//
-//    @AfterEach
-//    void resetRx() { RxJavaPlugins.reset(); Assertions.assertTrue(errors.isEmpty(), () -> "handler threw: " + errors); }
 }
