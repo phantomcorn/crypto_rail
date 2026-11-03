@@ -1,0 +1,27 @@
+package com.example.crypto_rail.invoice;
+
+import com.example.crypto_rail.utils.Web3jAdapter;
+import io.reactivex.Flowable;
+import io.reactivex.processors.PublishProcessor;
+import org.springframework.context.annotation.Profile;
+import org.web3j.protocol.websocket.events.NewHeadsNotification;
+
+@Profile("test")
+public class Web3jClientTestAdapter implements Web3jAdapter {
+
+    private final Flowable<NewHeadsNotification> notification;
+
+    public Web3jClientTestAdapter(PublishProcessor<NewHeadsNotification> newHeadPublisher) {
+        this.notification = newHeadPublisher;
+    }
+
+    @Override
+    public void onError(Throwable err) {
+        err.printStackTrace();
+    }
+
+    @Override
+    public Flowable<NewHeadsNotification> getPublisher() {
+        return notification;
+    }
+}

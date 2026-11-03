@@ -2,6 +2,7 @@ package com.example.crypto_rail.utils;
 
 import io.reactivex.Flowable;
 import lombok.Getter;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
@@ -17,7 +18,8 @@ import java.util.Collections;
 
 @Getter
 @Component
-public class Web3jClientAdapter {
+@Profile("!test")
+public class Web3jClientAdapter implements Web3jAdapter{
 
     private Flowable<NewHeadsNotification> notification;
 
@@ -44,8 +46,14 @@ public class Web3jClientAdapter {
         );
     }
 
+    @Override
     public void onError(Throwable err) {
         err.printStackTrace();
+    }
+
+    @Override
+    public Flowable<NewHeadsNotification> getPublisher() {
+        return notification;
     }
 
 }

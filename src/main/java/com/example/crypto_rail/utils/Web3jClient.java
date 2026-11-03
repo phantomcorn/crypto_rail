@@ -11,6 +11,7 @@ import io.vertx.core.json.JsonObject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@Profile("!test")
 public class Web3jClient {
 
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
@@ -60,9 +62,9 @@ public class Web3jClient {
     @Autowired
     InvoicePaymentService invoicePaymentService;
 
-    public Web3jClient(Web3jClientAdapter adapter) {
+    public Web3jClient(Web3jAdapter adapter) {
         //            log.error("newHeads subscriber failed", err);
-        disposable = adapter.getNotification().subscribe(this::handler, adapter::onError);
+        disposable = adapter.getPublisher().subscribe(this::handler, adapter::onError);
     }
 
     private void handler(NewHeadsNotification notification) throws IOException {
@@ -259,4 +261,5 @@ public class Web3jClient {
 
         return new NewSignatureDto(Numeric.toHexString(signatureBytes), deadline);
     }
+
 }
