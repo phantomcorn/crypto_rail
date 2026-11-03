@@ -8,6 +8,7 @@ import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.dto.BlockDto;
 import io.reactivex.disposables.Disposable;
 import io.vertx.core.json.JsonObject;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,9 @@ public class Web3jClient {
     public static final String topic0 = Hash.sha3String("PaymentReceived(bytes32)");
 
     private final Deque<BlockDto> processedBlock = new ArrayDeque<>();
-    private Disposable disposable;
+
+    @Getter
+    Disposable disposable;
 
     @Autowired
     Web3j web3j;
@@ -57,8 +60,9 @@ public class Web3jClient {
     @Autowired
     InvoicePaymentService invoicePaymentService;
 
-    public Web3jClient(@Autowired Web3jClientAdapter adapter) {
-        disposable = adapter.getNotification().subscribe(this::handler, err -> log.error("newHeads subscriber failed", err));
+    public Web3jClient(Web3jClientAdapter adapter) {
+        //            log.error("newHeads subscriber failed", err);
+        disposable = adapter.getNotification().subscribe(this::handler, adapter::onError);
     }
 
     private void handler(NewHeadsNotification notification) throws IOException {
@@ -210,7 +214,7 @@ public class Web3jClient {
         while(!p.blockHash().equals(q.getHash())) {
             //if processedBlock is empty => common ancestor becomes the fork common block (q)
             if (processedBlock.isEmpty()) {
-                return new BlockDto(q.getNumber().toString(), q.getHash());
+                return new BlockDto(Numeric.toHexString(q.getNumber().toByteArray()), q.getHash());
             }
             p = processedBlock.removeLast();
             q = web3j.ethGetBlockByHash(q.getParentHash(),false).send().getBlock();

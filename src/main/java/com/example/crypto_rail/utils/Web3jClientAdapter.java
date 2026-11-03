@@ -2,6 +2,7 @@ package com.example.crypto_rail.utils;
 
 import io.reactivex.Flowable;
 import lombok.Getter;
+import org.springframework.stereotype.Component;
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.websocket.WebSocketClient;
@@ -15,6 +16,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 @Getter
+@Component
 public class Web3jClientAdapter {
 
     private Flowable<NewHeadsNotification> notification;
@@ -40,6 +42,10 @@ public class Web3jClientAdapter {
                 "eth_unsubscribe",
                 NewHeadsNotification.class
         );
+    }
+
+    public void onError(Throwable err) {
+        err.printStackTrace();
     }
 
 }
