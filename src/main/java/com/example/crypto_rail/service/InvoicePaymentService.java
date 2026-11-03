@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class InvoicePaymentService {
@@ -38,6 +39,15 @@ public class InvoicePaymentService {
         invoicePaymentRepository.saveAll(
                 payments.stream().map(this::toEntity).toList()
         );
+    }
+
+    public Optional<InvoicePaymentDto> findByInvoiceHashId(String invoiceHashId) {
+        Optional<InvoicePayment> found = invoicePaymentRepository.findById(invoiceHashId);
+        if (found.isEmpty()){
+            return Optional.empty();
+        }
+        InvoicePayment payment = found.get();
+        return Optional.of(new InvoicePaymentDto(payment.getInvoiceHashId(), payment.getBlockNumber(), payment.getBlockHash()));
     }
 
     public void removeAllById(List<String> droppedHashIds) {
