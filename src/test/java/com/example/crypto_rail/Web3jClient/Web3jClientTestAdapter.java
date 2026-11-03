@@ -1,4 +1,4 @@
-package com.example.crypto_rail.invoice;
+package com.example.crypto_rail.Web3jClient;
 
 import com.example.crypto_rail.utils.Web3jAdapter;
 import io.reactivex.Flowable;

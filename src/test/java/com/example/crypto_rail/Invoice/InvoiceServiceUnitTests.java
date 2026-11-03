@@ -1,4 +1,4 @@
-package com.example.crypto_rail.invoice.unit;
+package com.example.crypto_rail.Invoice;
 
 import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.entity.Status;

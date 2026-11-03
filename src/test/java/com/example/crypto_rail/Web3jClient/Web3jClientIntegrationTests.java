@@ -1,4 +1,4 @@
-package com.example.crypto_rail.invoice.integration;
+package com.example.crypto_rail.Web3jClient;
 
 import com.example.crypto_rail.dto.InvoicePaymentDto;
 import com.example.crypto_rail.invoice.unit.NotificationWithLogs;

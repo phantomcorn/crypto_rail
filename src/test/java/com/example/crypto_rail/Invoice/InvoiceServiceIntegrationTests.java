@@ -1,4 +1,4 @@
-package com.example.crypto_rail.invoice.integration;
+package com.example.crypto_rail.Invoice;
 
 import com.example.crypto_rail.dto.InvoiceDto;
 import com.example.crypto_rail.dto.PayRequestDto;
@@ -6,7 +6,6 @@ import com.example.crypto_rail.entity.Invoice;
 import com.example.crypto_rail.entity.Status;
 import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.service.InvoiceService;
-import com.example.crypto_rail.utils.Web3jClient;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,9 +28,6 @@ public class InvoiceServiceIntegrationTests {
 
     @Autowired
     InvoiceService invoiceService;
-
-    @Autowired
-    Web3jClient web3jClient;
 
     public void changeStatusTo(String hashId, Status status) {
         Optional<Invoice> found = invoiceRepository.findByHashId(hashId);

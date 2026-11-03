@@ -1,4 +1,4 @@
-package com.example.crypto_rail.invoice.unit;
+package com.example.crypto_rail.InvoicePayments;
 
 import com.example.crypto_rail.repository.InvoicePaymentRepository;
 import com.example.crypto_rail.service.InvoicePaymentService;
