@@ -156,7 +156,7 @@ public class Web3jClient {
             return;
         }
 
-        Set<InvoicePaymentDto> paymentOnChain = logResults.stream().map(result -> {
+        Set<InvoicePaymentDto> paymentOnChain = filteredLogResults.stream().map(result -> {
             Log log = (Log) result;
             return new InvoicePaymentDto(log.getTopics().get(1), log.getBlockNumber(), log.getBlockHash());
         }).collect(Collectors.toSet());
