@@ -1,11 +1,10 @@
 package com.example.crypto_rail.Web3jClient;
 
 import com.example.crypto_rail.dto.InvoicePaymentDto;
-import com.example.crypto_rail.invoice.unit.NotificationWithLogs;
 import com.example.crypto_rail.service.InvoicePaymentService;
 import com.example.crypto_rail.service.InvoiceService;
+import com.example.crypto_rail.utils.Web3jAdapter;
 import com.example.crypto_rail.utils.Web3jClient;
-import com.example.crypto_rail.utils.Web3jClientAdapter;
 import io.reactivex.processors.PublishProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
@@ -38,6 +37,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,15 +53,14 @@ import static org.mockito.Mockito.*;
 public class Web3jClientIntegrationTests {
 
     @Mock
-    Web3jClientAdapter web3jClientAdapter;
-
-    @Mock
     Web3j web3j;
 
     Web3jClient web3jClient;
-    PublishProcessor<NewHeadsNotification> newHeadPublisher;
+    Web3jAdapter web3jClientTestAdapter;
+
     List<NewHeadsNotification> normalChain;
     List<NewHeadsNotification> reorgChain;
+    PublishProcessor<NewHeadsNotification> newHeadPublisher;
 
     @MockitoSpyBean //MockitoSpyBean wraps a bean so that you can treat them as mock
     InvoicePaymentService invoicePaymentService;
@@ -208,10 +208,10 @@ public class Web3jClientIntegrationTests {
     }
 
     @BeforeEach
-    public void buildClient() {
+    public void buildClient() throws URISyntaxException, ConnectException {
         newHeadPublisher = PublishProcessor.create();
-        when(web3jClientAdapter.getNotification()).thenReturn(newHeadPublisher);
-        web3jClient = new Web3jClient(web3jClientAdapter);
+        web3jClientTestAdapter = new Web3jClientTestAdapter(newHeadPublisher);
+        web3jClient = new Web3jClient(web3jClientTestAdapter);
         ReflectionTestUtils.setField(web3jClient, "web3j", web3j);
         ReflectionTestUtils.setField(web3jClient, "invoiceService", invoiceService);
         ReflectionTestUtils.setField(web3jClient, "invoicePaymentService", invoicePaymentService);
