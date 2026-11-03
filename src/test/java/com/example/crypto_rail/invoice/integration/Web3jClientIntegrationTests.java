@@ -1,6 +1,7 @@
-package com.example.crypto_rail.invoice.unit;
+package com.example.crypto_rail.invoice.integration;
 
 import com.example.crypto_rail.dto.InvoicePaymentDto;
+import com.example.crypto_rail.invoice.unit.NotificationWithLogs;
 import com.example.crypto_rail.service.InvoicePaymentService;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.utils.Web3jClient;
@@ -16,13 +17,16 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.Request;
-import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.websocket.events.NewHead;
@@ -35,28 +39,32 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@Transactional
 @Slf4j
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-public class Web3jClientUnitTests {
+@SpringBootTest @ActiveProfiles("test")
+public class Web3jClientIntegrationTests {
 
     @Mock
     Web3jClientAdapter web3jClientAdapter;
+
+    @Mock
+    Web3j web3j;
 
     Web3jClient web3jClient;
     PublishProcessor<NewHeadsNotification> newHeadPublisher;
     List<NewHeadsNotification> normalChain;
     List<NewHeadsNotification> reorgChain;
 
-    @Mock
-    Web3j web3j;
-    @Mock
+    @MockitoSpyBean //MockitoSpyBean wraps a bean so that you can treat them as mock
     InvoicePaymentService invoicePaymentService;
-    @Mock
+    @MockitoSpyBean
     InvoiceService invoiceService;
 
     public void mockEthGetLogs(NewHead block, List<EthLog.LogResult> logs) throws IOException {
@@ -65,22 +73,32 @@ public class Web3jClientUnitTests {
         EthLog mockEthLog = mock(EthLog.class);
 
         doReturn(mockReq).when(web3j).ethGetLogs(
-            argThat(arg -> {
-                boolean equalHash = arg.getBlockHash() != null && arg.getBlockHash().equals(block.getHash());
-                boolean notNull = arg.getFromBlock() != null && arg.getToBlock() != null;
-                boolean isFromName = arg.getFromBlock() instanceof DefaultBlockParameterName;
-                boolean isToName = arg.getToBlock() instanceof DefaultBlockParameterName;
-                boolean inBetween = notNull &&
-                        (
-                            (!isFromName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getFromBlock().getValue())) >= 0) ||
-                            (!isToName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getToBlock().getValue())) <= 0)
-                        );
+                argThat(arg -> {
+                    boolean equalHash = arg.getBlockHash() != null && arg.getBlockHash().equals(block.getHash());
+                    boolean notNull = arg.getFromBlock() != null && arg.getToBlock() != null;
+                    boolean isFromName = arg.getFromBlock() instanceof DefaultBlockParameterName;
+                    boolean isToName = arg.getToBlock() instanceof DefaultBlockParameterName;
+                    boolean inBetween = notNull &&
+                            (
+                                    (!isFromName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getFromBlock().getValue())) >= 0) ||
+                                            (!isToName && Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(arg.getToBlock().getValue())) <= 0)
+                            );
 
-                return equalHash || inBetween;
-            })
+                    return equalHash || inBetween;
+                })
         ); //using the when convention causes java to complain using wildcards
         when(mockReq.send()).thenReturn(mockEthLog);
         when(mockEthLog.getLogs()).thenReturn(logs);
+    }
+
+    public EthLog.LogObject newLogObj(boolean withTopic, String invoiceId) {
+        EthLog.LogObject logResult = new EthLog.LogObject();
+        if (withTopic) {
+            logResult.setTopics(List.of(Web3jClient.topic0, invoiceId));
+        } else {
+            logResult.setTopics(Collections.emptyList());
+        }
+        return logResult;
     }
 
     public EthLog.LogObject newLogObj(boolean withTopic) {
@@ -134,8 +152,27 @@ public class Web3jClientUnitTests {
         }
     }
 
+    public void mockChain(List<NotificationWithLogs> notificationWithLogs) throws IOException {
+        for (NotificationWithLogs notificationWithLog : notificationWithLogs) {
+            List<String> invoiceIds = notificationWithLog.invoiceIds();
+            NewHeadsNotification newHeadsNotification = notificationWithLog.notification();
+            NewHead head = newHeadsNotification.getParams().getResult();
+            EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
+            assert(Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0) == !invoiceIds.isEmpty());
+            if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
+                List<EthLog.LogResult> results = invoiceIds.stream().map(id -> newLogObj(true, id)).collect(Collectors.toList());
+                mockEthGetLogs(head, results);
+            } else {
+                mockEthGetLogs(head, List.of(newLogObj(false)));
+            }
+            mockBlockByNumber(block);
+            mockBlockByHash(block);
+        }
+
+    }
+
     public void mockBlockByNumber(EthBlock result) throws IOException {
-        Request<?, EthBlock> request = Mockito.mock(Request.class);
+        Request<?, EthBlock> request = mock(Request.class);
         request.setId(result.getId());
         DefaultBlockParameter exact = DefaultBlockParameter.valueOf(result.getBlock().getNumber());
         doReturn(request).when(web3j).ethGetBlockByNumber(argThat(val -> val.getValue().equals(exact.getValue())), eq(false));
@@ -143,9 +180,23 @@ public class Web3jClientUnitTests {
     }
 
     public void mockBlockByHash(EthBlock result) throws IOException {
-        Request<?, EthBlock> request = Mockito.mock(Request.class);
+        Request<?, EthBlock> request = mock(Request.class);
         doReturn(request).when(web3j).ethGetBlockByHash(eq(result.getBlock().getHash()), eq(false));
         when(request.send()).thenReturn(result);
+    }
+
+    public boolean containsPaymentEvent(NewHead block) {
+        return Bloom.test(block.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0);
+    }
+
+    public boolean isBeforeCommonAncestor(NewHead block) {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) < 0;
+    }
+
+    public boolean isAfterOrOnCommonAncestor(NewHead block) {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) >= 0;
     }
 
 
@@ -158,7 +209,6 @@ public class Web3jClientUnitTests {
 
     @BeforeEach
     public void buildClient() {
-
         newHeadPublisher = PublishProcessor.create();
         when(web3jClientAdapter.getNotification()).thenReturn(newHeadPublisher);
         web3jClient = new Web3jClient(web3jClientAdapter);
@@ -192,7 +242,7 @@ public class Web3jClientUnitTests {
         NewHeadsNotification blockNotificationWithTopic = normalChain.get(1);
         NewHead blockWithTopic = blockNotificationWithTopic.getParams().getResult();
         Assertions.assertEquals("0x00000000000400000000000000000000000000000008000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000", blockWithTopic.getLogsBloom());
-        Assertions.assertTrue(Bloom.test(blockWithTopic.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0));
+        Assertions.assertTrue(containsPaymentEvent(blockWithTopic));
         newHeadPublisher.onNext(blockNotificationWithTopic);
         Mockito.verify(web3j).ethGetLogs(any());
     }
@@ -295,18 +345,16 @@ public class Web3jClientUnitTests {
 
         newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
         verify(web3j).ethGetLogs(argThat(filter -> {
-                if (filter.getFromBlock() == null && filter.getToBlock() == null) {
-                    return false;
+                    if (filter.getFromBlock() == null && filter.getToBlock() == null) {
+                        return false;
+                    }
+
+                    return filter.getFromBlock().getValue().equals(commonAncestor.getNumber()) &&
+                            filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue()) &&
+                            filter.getAddress().get(0).equals(Web3jClient.CRYPTO_RAIL_ADDRESS);
                 }
-
-                return filter.getFromBlock().getValue().equals(commonAncestor.getNumber()) &&
-                filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue()) &&
-                filter.getAddress().get(0).equals(Web3jClient.CRYPTO_RAIL_ADDRESS);
-            }
-
         ));
     }
-
 
     @Test
     public void initiallyThereIsNoReorg() {
