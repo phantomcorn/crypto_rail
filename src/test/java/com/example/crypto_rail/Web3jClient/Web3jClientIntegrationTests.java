@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -24,7 +23,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
@@ -82,14 +80,17 @@ public class Web3jClientIntegrationTests {
     @Autowired
     AutowireCapableBeanFactory beanFactory;
 
-    public void mockEthGetLogs(List<EthLog.LogResult> logs) throws IOException {
+    public void mockEthGetLogs(List<EthLog.LogResult> logs) {
 
         doAnswer(inv -> {
             EthFilter filter = inv.getArgument(0);
             List<EthLog.LogResult> out = logs;
 
             if (filter.getBlockHash() != null) {
-                out = out.stream().filter(logResult -> ((Log) logResult.get()).getBlockHash().equals(filter.getBlockHash())).toList();
+                out = out
+                        .stream()
+                        .filter(logResult -> ((Log) logResult.get()).getBlockHash().equals(filter.getBlockHash()))
+                        .toList();
             }
 
             if (filter.getToBlock() != null && filter.getFromBlock() != null) {
@@ -135,16 +136,7 @@ public class Web3jClientIntegrationTests {
     }
 
     public EthLog.LogObject newLogObj(NewHead block, boolean withTopic) {
-        EthLog.LogObject logResult = new EthLog.LogObject();
-        if (withTopic) {
-            logResult.setTopics(List.of(Web3jClient.topic0, Hash.sha3String(UUID.randomUUID().toString())));
-        } else {
-            logResult.setTopics(Collections.emptyList());
-        }
-        logResult.setBlockHash(block.getHash());
-        logResult.setAddress(Web3jClient.CRYPTO_RAIL_ADDRESS);
-        logResult.setBlockNumber(block.getNumber());
-        return logResult;
+        return newLogObj(block, withTopic, Hash.sha3String(UUID.randomUUID().toString()));
     }
 
     public EthBlock newBlock(String number, String hash, String parentHash) {
@@ -194,7 +186,6 @@ public class Web3jClientIntegrationTests {
 
     public void mockChain(List<NotificationWithLogs> notificationWithLogs) throws IOException {
         List<EthLog.LogResult> allLogs = new ArrayList<>();
-
         for (NotificationWithLogs notificationWithLog : notificationWithLogs) {
             List<String> invoiceIds = notificationWithLog.invoiceIds();
             NewHeadsNotification newHeadsNotification = notificationWithLog.notification();
@@ -204,10 +195,6 @@ public class Web3jClientIntegrationTests {
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
                 invoiceIds.forEach(id -> {
                     allLogs.add(newLogObj(head,true, id));
-                });
-            } else {
-                invoiceIds.forEach(id -> {
-                    allLogs.add(newLogObj(head, false));
                 });
             }
             mockBlockByNumber(block);
