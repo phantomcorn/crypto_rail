@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.logging.log4j.util.Strings.repeat;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class InvoiceServiceUnitTests {
@@ -87,6 +87,10 @@ public class InvoiceServiceUnitTests {
 
     }
 
+    public String randomHashId() {
+        return Hash.sha3String(UUID.randomUUID().toString());
+    }
+
     @Test
     public void createInvoiceShouldCreateNewInvoiceEntry() {
     }
@@ -99,149 +103,156 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void detectPaymentOnNonExistingInvoiceWillReturnsFalse() {
-        Mockito.when(invoiceRepository.findByHashId(INVALID_HASH_ID)).thenReturn(Optional.empty());
+        Mockito.when(invoiceRepository.lockByStatus(List.of(INVALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of());
         Assertions.assertFalse(invoiceService.detectPayment(INVALID_HASH_ID));
     }
 
     @Test
     public void detectPaymentOnExistingInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(VALID_HASH_ID));
+        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.detectPayment(VALID_HASH_ID));
     }
 
     @Test
     public void detectPaymentDoesNotProcessConfirmedInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(CONFIRMED_INVOICE));
         Assertions.assertFalse(invoiceService.detectPayment(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.CONFIRMED);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.CONFIRMED, Status.DETECTED);
     }
 
     @Test
     public void detectPaymentDoesNotProcessDetectedInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
         Assertions.assertFalse(invoiceService.detectPayment(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.DETECTED, Status.DETECTED);
     }
 
     @Test
     public void detectPaymentDoesNotProcessReorgInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(REORG_INVOICE));
         Assertions.assertFalse(invoiceService.detectPayment(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.REORG);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.REORG, Status.DETECTED);
     }
 
     @Test
     public void detectPaymentOnlyProcessUnpaidInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(VALID_HASH_ID));
+        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.detectPayment(VALID_HASH_ID));
     }
 
     @Test
     public void revertOnNonExistingInvoiceWillReturnsFalse() {
-        Mockito.when(invoiceRepository.findByHashId(INVALID_HASH_ID)).thenReturn(Optional.empty());
+        Mockito.when(invoiceRepository.lockByStatus(List.of(INVALID_HASH_ID), Status.DETECTED)).thenReturn(List.of());
         Assertions.assertFalse(invoiceService.revert(INVALID_HASH_ID));
     }
 
     @Test
     public void revertOnExistingInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(VALID_HASH_ID));
+        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.DETECTED, Status.REORG)).thenReturn(1);
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
     @Test
     public void revertDoesNotProcessUnpaidInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(UNPAID_INVOICE));
         Assertions.assertFalse(invoiceService.revert(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.NOT_PAID, Status.REORG);
     }
 
     @Test
     public void revertDoesNotProcessConfirmedInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(CONFIRMED_INVOICE));
-        Assertions.assertFalse(invoiceService.revert(VALID_HASH_ID));
+        Assertions.assertFalse(invoiceService.detectPayment(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.CONFIRMED);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.CONFIRMED, Status.REORG);
     }
 
     @Test
     public void revertDoesNotProcessReorgInvoiceWillReturnFalse() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(REORG_INVOICE));
-        Assertions.assertFalse(invoiceService.revert(VALID_HASH_ID));
+        Assertions.assertFalse(invoiceService.detectPayment(VALID_HASH_ID));
+        verify(invoiceRepository, never()).lockByStatus(List.of(VALID_HASH_ID), Status.REORG);
+        verify(invoiceRepository, never()).transition(List.of(VALID_HASH_ID), Status.REORG, Status.REORG);
     }
 
     @Test
     public void revertOnlyProcessDetectedInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.findByHashId(VALID_HASH_ID)).thenReturn(Optional.of(DETECTED_INVOICE));
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(VALID_HASH_ID));
+        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.DETECTED, Status.REORG)).thenReturn(1);
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
     @Test
     public void detectPaymentAllWithAllUnpaidInvoiceWillReturnTrue() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, UNPAID_INVOICE));
-        Assertions.assertTrue(invoiceService.detectPaymentAll(allValid));
+        List<String> ids = List.of(UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(ids);
+        Mockito.when(invoiceRepository.transition(ids, Status.NOT_PAID, Status.DETECTED)).thenReturn(ids.size());
+        Assertions.assertTrue(invoiceService.detectPaymentAll(ids));
     }
 
     @Test
     public void detectPaymentAllWithNoUnpaidInvoiceWillReturnFalse() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
+        List<String> ids = List.of(REORG_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId());
 
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(DETECTED_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
-        Assertions.assertFalse(invoiceService.detectPaymentAll(allValid));
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of());
+        Assertions.assertFalse(invoiceService.revertAll(ids));
     }
 
     @Test
     public void detectPaymentAllWillOnlyUpdateUnpaidInvoice() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, DETECTED_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
-        Assertions.assertTrue(invoiceService.detectPaymentAll(allValid));
-        Mockito.verify(invoiceRepository, times(1)).saveAllAndFlush(List.of(UNPAID_INVOICE));
+        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(List.of(UNPAID_INVOICE.getHashId(),UNPAID_INVOICE.getHashId()));
+        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId(),UNPAID_INVOICE.getHashId()), Status.NOT_PAID, Status.DETECTED)).thenReturn(2);
+        Assertions.assertTrue(invoiceService.detectPaymentAll(ids));
     }
 
     @Test
     public void toFinalityWithAllDetectedInvoiceWillReturnTrue() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(DETECTED_INVOICE, DETECTED_INVOICE));
-        Assertions.assertTrue(invoiceService.toFinality(allValid));
+        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(ids);
+        Mockito.when(invoiceRepository.transition(ids, Status.DETECTED, Status.CONFIRMED)).thenReturn(ids.size());
+        Assertions.assertTrue(invoiceService.toFinality(ids));
     }
 
     @Test
     public void toFinalityWithNoDetectedInvoiceWillReturnFalse() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
+        List<String> ids = List.of(UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
 
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
-        Assertions.assertFalse(invoiceService.toFinality(allValid));
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of());
+        Assertions.assertFalse(invoiceService.revertAll(ids));
     }
 
     @Test
     public void toFinalityWillOnlyUpdateOnDetectedInvoice() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, DETECTED_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
-        Assertions.assertTrue(invoiceService.toFinality(allValid));
-        Mockito.verify(invoiceRepository, times(1)).saveAllAndFlush(List.of(DETECTED_INVOICE));
+        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE.getHashId()));
+        Mockito.when(invoiceRepository.transition(List.of(DETECTED_INVOICE.getHashId()), Status.DETECTED, Status.CONFIRMED)).thenReturn(1);
+        Assertions.assertTrue(invoiceService.toFinality(ids));
     }
 
     @Test
     public void revertAllWithAllDetectedInvoiceWillReturnTrue() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(DETECTED_INVOICE, DETECTED_INVOICE));
-        Assertions.assertTrue(invoiceService.revertAll(allValid));
+        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(ids);
+        Mockito.when(invoiceRepository.transition(ids, Status.DETECTED, Status.REORG)).thenReturn(ids.size());
+        Assertions.assertTrue(invoiceService.revertAll(ids));
     }
 
     @Test
     public void revertAllWithNoDetectedInvoiceWillReturnFalse() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
+        List<String> ids = List.of(UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
 
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, CONFIRMED_INVOICE, REORG_INVOICE));
-        Assertions.assertFalse(invoiceService.revertAll(allValid));
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of());
+        Assertions.assertFalse(invoiceService.revertAll(ids));
     }
 
     @Test
     public void revertAllWillOnlyUpdateOnDetectedInvoice() {
-        List<String> allValid = List.of(VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID, VALID_HASH_ID);
-
-        Mockito.when(invoiceRepository.findAllByHashIdIn(allValid)).thenReturn(List.of(UNPAID_INVOICE, DETECTED_INVOICE, REORG_INVOICE, CONFIRMED_INVOICE));
-        Assertions.assertTrue(invoiceService.revertAll(allValid));
-        Mockito.verify(invoiceRepository, times(1)).saveAllAndFlush(List.of(DETECTED_INVOICE));
+        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE.getHashId()));
+        Mockito.when(invoiceRepository.transition(List.of(DETECTED_INVOICE.getHashId()), Status.DETECTED, Status.REORG)).thenReturn(1);
+        Assertions.assertTrue(invoiceService.revertAll(ids));
     }
 
 

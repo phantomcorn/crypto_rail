@@ -11,6 +11,7 @@ import com.example.crypto_rail.utils.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
@@ -72,73 +73,49 @@ public class InvoiceService {
         return Optional.of(found.get().toDto());
     }
 
+    @Transactional
     public boolean detectPayment(String hashId) {
-        Optional<Invoice> found = invoiceRepository.findByHashId(hashId);
-        if (found.isEmpty()) {
-            return false;
-        }
-        Invoice invoice = found.get();
-        if (!invoice.getStatus().equals(Status.NOT_PAID)) {
-            return false;
-        }
-
-        invoice.setStatus(Status.DETECTED);
-        invoiceRepository.save(invoice);
-        return true;
+        return detectPaymentAll(List.of(hashId));
     }
 
+    @Transactional
     public boolean detectPaymentAll(List<String> hashIds) {
-        List<Invoice> invoices = invoiceRepository.findAllByHashIdIn(hashIds);
-        List<Invoice> detectedInvoice = invoices.stream().filter(invoice -> invoice.getStatus().equals(Status.NOT_PAID))
-                .peek(invoice -> invoice.setStatus(Status.DETECTED))
-                .toList();
-
-        if (detectedInvoice.isEmpty()) {
+        List<String> lockedIds = invoiceRepository.lockByStatus(hashIds, Status.NOT_PAID);
+        if (lockedIds.isEmpty()) {
             return false;
         }
-        invoiceRepository.saveAllAndFlush(detectedInvoice);
-        return true;
+
+        int changes = invoiceRepository.transition(lockedIds, Status.NOT_PAID, Status.DETECTED);
+        //TODO: publish event
+        return changes > 0;
     }
 
+    @Transactional
     public boolean toFinality(List<String> hashIds) {
-        List<Invoice> invoiceToFinalize = invoiceRepository.findAllByHashIdIn(hashIds);
-
-        //only update ones that are in DETECTED
-        List<Invoice> unconfirmedInvoice = invoiceToFinalize
-                .stream().filter(invoice -> invoice.getStatus().equals(Status.DETECTED))
-                .peek(invoice -> invoice.setStatus(Status.CONFIRMED))
-                .toList();
-        if (unconfirmedInvoice.isEmpty()) {
+        List<String> lockedIds = invoiceRepository.lockByStatus(hashIds, Status.DETECTED);
+        if (lockedIds.isEmpty()) {
             return false;
         }
-        invoiceRepository.saveAllAndFlush(unconfirmedInvoice);
-        return true;
+
+        int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.CONFIRMED);
+        //TODO: publish event
+        return changes > 0;
     }
 
+    @Transactional
     public boolean revert(String droppedHashId) {
-        Optional<Invoice> found = invoiceRepository.findByHashId(droppedHashId);
-        if (found.isEmpty()) {
-            return false;
-        }
-        Invoice invoice = found.get();
-        if (!invoice.getStatus().equals(Status.DETECTED)) {
-            return false;
-        }
-        invoice.setStatus(Status.REORG);
-        invoiceRepository.save(invoice);
-        return true;
+        return revertAll(List.of(droppedHashId));
     }
 
+    @Transactional
     public boolean revertAll(List<String> droppedHashIds) {
-        List<Invoice> foundInvoice = invoiceRepository.findAllByHashIdIn(droppedHashIds);
-        List<Invoice> revertedInvoices = foundInvoice
-                .stream().filter(invoice -> invoice.getStatus().equals(Status.DETECTED))
-                .peek(invoice -> invoice.setStatus(Status.REORG))
-                .toList();
-        if (revertedInvoices.isEmpty()) {
+        List<String> lockedIds = invoiceRepository.lockByStatus(droppedHashIds, Status.DETECTED);
+        if (lockedIds.isEmpty()) {
             return false;
         }
-        invoiceRepository.saveAllAndFlush(revertedInvoices);
-        return true;
+
+        int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.REORG);
+        //TODO: publish event
+        return changes > 0;
     }
 }

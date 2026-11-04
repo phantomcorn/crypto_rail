@@ -46,11 +46,11 @@ public class InvoiceServiceIntegrationTests {
                 .tokenAddress("22222222222222222222")
                 .build();
 
-        Assertions.assertEquals(1, invoiceRepository.findAll().size());
+        Assertions.assertEquals(4, invoiceRepository.findAll().size());
 
         InvoiceDto newInvoice = invoiceService.createInvoice(payRequestDto).newInvoice();
 
-        Assertions.assertEquals(2, invoiceRepository.findAll().size());
+        Assertions.assertEquals(5, invoiceRepository.findAll().size());
 
         Assertions.assertEquals(payRequestDto.getAmount(), newInvoice.amount());
         Assertions.assertEquals(payRequestDto.getMerchantAddress(), newInvoice.merchantAddress());
@@ -222,11 +222,11 @@ public class InvoiceServiceIntegrationTests {
         List<Invoice> unpaidInvoices = invoices.stream().filter(invoice -> invoice.getStatus().equals(Status.NOT_PAID)).toList();
         List<Invoice> notUnpaidInvoices = invoices.stream().filter(invoice -> !invoice.getStatus().equals(Status.NOT_PAID)).toList();
 
-        invoiceService.toFinality(invoices.stream().map(Invoice::getHashId).toList());
+        invoiceService.detectPaymentAll(invoices.stream().map(Invoice::getHashId).toList());
 
         unpaidInvoices.forEach(invoice -> {
             Invoice updatedInvoice = invoiceRepository.findByHashId(invoice.getHashId()).get();
-            Assertions.assertEquals(Status.CONFIRMED, updatedInvoice.getStatus());
+            Assertions.assertEquals(Status.DETECTED, updatedInvoice.getStatus());
         });
 
         notUnpaidInvoices.forEach(invoice -> {
