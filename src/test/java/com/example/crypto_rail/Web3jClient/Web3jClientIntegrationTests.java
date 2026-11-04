@@ -103,7 +103,7 @@ public class Web3jClientIntegrationTests {
                         lowerBounded = lowerBound.compareTo(log.getBlockNumber()) <= 0;
                     }
 
-                    if (filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
+                    if (!filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
                         BigInteger upperBound = Numeric.toBigInt(filter.getToBlock().getValue());
                         upperBounded = upperBound.compareTo(log.getBlockNumber()) >= 0;
                     }
@@ -130,7 +130,7 @@ public class Web3jClientIntegrationTests {
         }
         logResult.setBlockHash(block.getHash());
         logResult.setAddress(Web3jClient.CRYPTO_RAIL_ADDRESS);
-        logResult.setBlockNumber(Numeric.toBigInt(block.getNumber()).toString());
+        logResult.setBlockNumber(block.getNumber());
         return logResult;
     }
 
@@ -143,7 +143,7 @@ public class Web3jClientIntegrationTests {
         }
         logResult.setBlockHash(block.getHash());
         logResult.setAddress(Web3jClient.CRYPTO_RAIL_ADDRESS);
-        logResult.setBlockNumber(Numeric.toBigInt(block.getNumber()).toString());
+        logResult.setBlockNumber(block.getNumber());
         return logResult;
     }
 
