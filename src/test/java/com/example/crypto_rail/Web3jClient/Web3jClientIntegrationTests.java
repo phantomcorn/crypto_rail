@@ -7,6 +7,7 @@ import com.example.crypto_rail.utils.Web3jAdapter;
 import com.example.crypto_rail.utils.Web3jClient;
 import io.reactivex.processors.PublishProcessor;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,7 @@ import static org.mockito.Mockito.*;
 @Import(Web3jConfig.class)
 public class Web3jClientIntegrationTests {
 
-    @Mock
+    @MockitoBean
     Web3j web3j;
 
     Web3jClient web3jClient;
@@ -244,7 +245,6 @@ public class Web3jClientIntegrationTests {
         return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) >= 0;
     }
 
-
     @BeforeEach
     public void loadBlockFromJson() {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -256,6 +256,11 @@ public class Web3jClientIntegrationTests {
     public void buildClient() throws URISyntaxException, ConnectException {
         web3jClient = new Web3jClient(web3jClientTestAdapter); //instantiating it like this does not go through autowired
         beanFactory.autowireBean(web3jClient); //which is why we autowire them manually
+    }
+
+    @AfterEach
+    public void clearMock() {
+        web3jClient.getDisposable().dispose();
     }
 
     @Test
