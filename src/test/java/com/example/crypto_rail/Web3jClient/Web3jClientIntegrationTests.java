@@ -16,8 +16,12 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,16 +56,21 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @SpringBootTest @ActiveProfiles("test")
+@Import(Web3jConfig.class)
 public class Web3jClientIntegrationTests {
 
     @Mock
     Web3j web3j;
 
     Web3jClient web3jClient;
+
+    @MockitoSpyBean
     Web3jAdapter web3jClientTestAdapter;
 
     List<NewHeadsNotification> normalChain;
     List<NewHeadsNotification> reorgChain;
+
+    @Autowired
     PublishProcessor<NewHeadsNotification> newHeadPublisher;
 
     @MockitoSpyBean //MockitoSpyBean wraps a bean so that you can treat them as mock

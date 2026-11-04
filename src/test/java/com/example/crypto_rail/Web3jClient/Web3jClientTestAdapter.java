@@ -3,10 +3,8 @@ package com.example.crypto_rail.Web3jClient;
 import com.example.crypto_rail.utils.Web3jAdapter;
 import io.reactivex.Flowable;
 import io.reactivex.processors.PublishProcessor;
-import org.springframework.context.annotation.Profile;
 import org.web3j.protocol.websocket.events.NewHeadsNotification;
 
-@Profile("test")
 public class Web3jClientTestAdapter implements Web3jAdapter {
 
     private final Flowable<NewHeadsNotification> notification;
