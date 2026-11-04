@@ -1,4 +1,4 @@
-package com.example.crypto_rail.Web3jClient;
+package com.example.crypto_rail.Web3jClient.utils;
 
 import org.web3j.protocol.websocket.events.NewHeadsNotification;
 

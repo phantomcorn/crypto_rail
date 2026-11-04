@@ -1,5 +1,7 @@
 package com.example.crypto_rail.Web3jClient;
 
+import com.example.crypto_rail.Web3jClient.utils.ChainViewBeforeAfterReorg;
+import com.example.crypto_rail.Web3jClient.utils.NotificationWithLogs;
 import com.example.crypto_rail.dto.InvoicePaymentDto;
 import com.example.crypto_rail.service.InvoicePaymentService;
 import com.example.crypto_rail.service.InvoiceService;
@@ -46,6 +48,7 @@ import java.math.BigInteger;
 import java.net.ConnectException;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -152,36 +155,32 @@ public class Web3jClientIntegrationTests {
         return ethBlock;
     }
 
-    public void mockForkChain() throws IOException {
-        List<EthLog.LogResult> allLogs = new ArrayList<>();
+    public List<NotificationWithLogs> setupForkChain() {
+        List<NotificationWithLogs> notificationWithLogs = new ArrayList<>();
         for (NewHeadsNotification newHeadsNotification : reorgChain) {
             NewHead head = newHeadsNotification.getParams().getResult();
-            EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
+            List<String> invoiceIds = new ArrayList<>();
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
-                allLogs.add(newLogObj(head, true));
-            } else {
-                allLogs.add(newLogObj(head, false));
+                invoiceIds.add(Hash.sha3String(UUID.randomUUID().toString()));
             }
-            mockBlockByNumber(block);
-            mockBlockByHash(block);
+
+            notificationWithLogs.add(new NotificationWithLogs(newHeadsNotification, invoiceIds));
         }
-        mockEthGetLogs(allLogs);
+        return notificationWithLogs;
     }
 
-    public void mockNormalChain() throws IOException {
-        List<EthLog.LogResult> allLogs = new ArrayList<>();
+    public List<NotificationWithLogs> setupNormalChain() {
+        List<NotificationWithLogs> notificationWithLogs = new ArrayList<>();
         for (NewHeadsNotification newHeadsNotification : normalChain) {
             NewHead head = newHeadsNotification.getParams().getResult();
-            EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
+            List<String> invoiceIds = new ArrayList<>();
             if (Bloom.test(head.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0)) {
-                allLogs.add(newLogObj(head, true));
-            } else {
-                allLogs.add(newLogObj(head, false));
+                invoiceIds.add(Hash.sha3String(UUID.randomUUID().toString()));
             }
-            mockBlockByNumber(block);
-            mockBlockByHash(block);
+
+            notificationWithLogs.add(new NotificationWithLogs(newHeadsNotification, invoiceIds));
         }
-        mockEthGetLogs(allLogs);
+        return notificationWithLogs;
     }
 
     public void mockChain(List<NotificationWithLogs> notificationWithLogs) throws IOException {
@@ -201,7 +200,18 @@ public class Web3jClientIntegrationTests {
             mockBlockByHash(block);
         }
         mockEthGetLogs(allLogs);
+    }
 
+    public ChainViewBeforeAfterReorg setupReorg(List<NotificationWithLogs> normalNotification, List<NotificationWithLogs> forkNotification, int startingPosition) {
+        assert(startingPosition <= normalNotification.size());
+        List<NotificationWithLogs> beforeReorg = Stream.concat(normalNotification.subList(startingPosition, normalNotification.size()).stream(), Stream.of(forkNotification.get(4))).toList();
+        List<NotificationWithLogs> afterReorg = Stream.concat(normalNotification.subList(0, 6).stream(), forkNotification.subList(0, 5).stream()).toList();
+
+        return new ChainViewBeforeAfterReorg(beforeReorg, afterReorg);
+    }
+
+    public ChainViewBeforeAfterReorg setupReorg(List<NotificationWithLogs> normalNotification, List<NotificationWithLogs> forkNotification) {
+        return setupReorg(normalNotification, forkNotification, 0);
     }
 
     public void mockBlockByNumber(EthBlock result) throws IOException {
@@ -350,15 +360,13 @@ public class Web3jClientIntegrationTests {
 
     @Test
     public void aReorgWillCheckForPaymentToFinalize() throws IOException {
-        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
-
-        mockNormalChain();
-        mockForkChain();
-
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
+        mockChain(view.before());
         for (NewHeadsNotification notification : normalChain) {
             newHeadPublisher.onNext(notification);
         }
 
+        mockChain(view.after());
         newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
         verify(invoicePaymentService).canFinalize(Numeric.toBigInt(reorgChain.get(4).getParams().getResult().getNumber()));
     }
@@ -366,14 +374,14 @@ public class Web3jClientIntegrationTests {
     @Test
     public void aReorgSweepsFromCommonAncestorToLatest() throws IOException {
         NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
 
-        mockNormalChain();
-        mockForkChain();
-
+        mockChain(view.before());
         for (NewHeadsNotification notification : normalChain) {
             newHeadPublisher.onNext(notification);
         }
 
+        mockChain(view.after());
         newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
         verify(web3j).ethGetLogs(argThat(filter -> {
                     if (filter.getFromBlock() == null && filter.getToBlock() == null) {
@@ -394,7 +402,7 @@ public class Web3jClientIntegrationTests {
 
     @Test
     public void mockGetBlockByNumberGrabsTheCorrectBlock() throws IOException {
-        mockNormalChain();
+        mockChain(setupNormalChain());
 
         for (NewHeadsNotification notification : normalChain) {
             NewHead expectedBlock = notification.getParams().getResult();
@@ -405,7 +413,7 @@ public class Web3jClientIntegrationTests {
 
     @Test
     public void mockGetBlockByHashGrabsTheCorrectBlock() throws IOException {
-        mockNormalChain();
+        mockChain(setupNormalChain());
 
         for (NewHeadsNotification notification : normalChain) {
             NewHead expectedBlock = notification.getParams().getResult();
