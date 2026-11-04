@@ -185,10 +185,10 @@ public class Web3jClient {
         List<InvoicePaymentDto> droppedPayment = paymentInDb.stream().filter(payment -> !hashIdsOnChain.contains(payment.invoiceHashId())).toList();// Update invoice status to REORG
 
         //1. update valid payments but modified block number + hash
-        invoicePaymentService.saveAll(stillValidNeedUpdate);
+        invoicePaymentService.update(stillValidNeedUpdate);
         //2. add new payments to table and update status
         List<String> newHashIds = newPayments.stream().map(InvoicePaymentDto::invoiceHashId).toList();
-        invoicePaymentService.saveAll(newPayments);
+        invoicePaymentService.insert(newPayments);
         invoiceService.detectPaymentAll(newHashIds);
         //3. drop payment (Delete payment entry and update status in invoices table)
         List<String> droppedHashIds = droppedPayment.stream().map(InvoicePaymentDto::invoiceHashId).toList();

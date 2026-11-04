@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,11 +36,37 @@ public class InvoicePaymentService {
         return invoicePaymentRepository.findByBlockNumberGreaterThanEqual(from).stream().map(InvoicePayment::toDto).toList();
     }
 
-    public void saveAll(List<InvoicePaymentDto> payments) {
+    private void saveAll(List<InvoicePaymentDto> payments) {
         invoicePaymentRepository.saveAll(
                 payments.stream().map(this::toEntity).toList()
         );
     }
+
+    public void insert(List<InvoicePaymentDto> payments) {
+        List<InvoicePaymentDto> nonExisting = new ArrayList<>();
+        for (InvoicePaymentDto dto: payments) {
+            if (invoicePaymentRepository.findById(dto.invoiceHashId()).isPresent()) {
+                //TODO : Log any payments that are skipped
+                continue;
+            }
+            nonExisting.add(dto);
+        }
+        saveAll(nonExisting);
+    }
+
+    public void update(List<InvoicePaymentDto> payments) {
+        List<InvoicePaymentDto> exist = new ArrayList<>();
+        for (InvoicePaymentDto dto: payments) {
+            if (invoicePaymentRepository.findById(dto.invoiceHashId()).isEmpty()) {
+                //TODO : Log any payments that are skipped
+                continue;
+            }
+            exist.add(dto);
+
+        }
+        saveAll(exist);
+    }
+
 
     public Optional<InvoicePaymentDto> findByInvoiceHashId(String invoiceHashId) {
         Optional<InvoicePayment> found = invoicePaymentRepository.findById(invoiceHashId);

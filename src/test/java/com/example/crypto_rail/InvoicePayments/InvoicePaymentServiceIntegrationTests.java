@@ -115,7 +115,7 @@ public class InvoicePaymentServiceIntegrationTests {
     }
 
     @Test
-    public void saveAllUpdatesAllInvoicePayment() {
+    public void updateUpdatesAllInvoicePayment() {
 
         List<String> ids = List.of(random(66), random(66), random(66));
 
@@ -133,13 +133,13 @@ public class InvoicePaymentServiceIntegrationTests {
                 new InvoicePaymentDto(ids.get(2), BigInteger.valueOf(5), random(66))
         );
 
-        invoicePaymentService.saveAll(paymentDtos);
+        invoicePaymentService.update(paymentDtos);
         Assertions.assertEquals(paymentDtos.size(), invoicePaymentRepository.findAll().size());
         Assertions.assertTrue(invoicePaymentRepository.findAll().stream().map(InvoicePayment::getInvoiceHashId).toList().containsAll(ids));
     }
 
     @Test
-    public void saveAllCreatesNewInvoicePayment() {
+    public void insertCreatesNewInvoicePayment() {
 
         List<String> ids = List.of(random(66), random(66), random(66));
 
@@ -150,13 +150,13 @@ public class InvoicePaymentServiceIntegrationTests {
         );
 
         Assertions.assertEquals(0, invoicePaymentRepository.findAll().size());
-        invoicePaymentService.saveAll(paymentDtos);
+        invoicePaymentService.insert(paymentDtos);
         Assertions.assertEquals(paymentDtos.size(), invoicePaymentRepository.findAll().size());
         Assertions.assertTrue(invoicePaymentRepository.findAll().stream().map(InvoicePayment::getInvoiceHashId).toList().containsAll(ids));
     }
 
     @Test
-    public void saveAllPassingDuplicateKeyDoesNotCreateDuplicateEntry() {
+    public void insertDuplicateKeyDoesNotCreateDuplicateEntry() {
         String id = random(66);
 
         List<InvoicePaymentDto> paymentDtos = List.of(
@@ -164,20 +164,20 @@ public class InvoicePaymentServiceIntegrationTests {
                 new InvoicePaymentDto(id, BigInteger.valueOf(2), random(66))
         );
 
-        invoicePaymentService.saveAll(paymentDtos);
+        invoicePaymentService.insert(paymentDtos);
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
         Assertions.assertEquals(id, invoicePaymentRepository.findAll().getFirst().getInvoiceHashId());
     }
 
     @Test
-    public void saveAllCallingTwiceOnDuplicateKeyDoesNotCreateDuplicateEntryButUpdate() {
+    public void insertShouldNotUpdateEntryWithExistingKey() {
         String id = random(66);
 
         List<InvoicePaymentDto> paymentDtos = List.of(
                 new InvoicePaymentDto(id, BigInteger.valueOf(1), random(66))
         );
 
-        invoicePaymentService.saveAll(paymentDtos);
+        invoicePaymentService.insert(paymentDtos);
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
         Assertions.assertEquals(id, invoicePaymentRepository.findAll().getFirst().getInvoiceHashId());
         Assertions.assertEquals(paymentDtos.getFirst().blockHash(), invoicePaymentRepository.findAll().getFirst().getBlockHash());
@@ -185,12 +185,26 @@ public class InvoicePaymentServiceIntegrationTests {
         List<InvoicePaymentDto> updatedPaymentDtos = List.of(
                 new InvoicePaymentDto(id, BigInteger.valueOf(2), random(66))
         );
+        invoicePaymentService.insert(updatedPaymentDtos);
 
-
-        invoicePaymentService.saveAll(updatedPaymentDtos);
         Assertions.assertEquals(1, invoicePaymentRepository.findAll().size());
         Assertions.assertEquals(id, invoicePaymentRepository.findAll().getFirst().getInvoiceHashId());
-        Assertions.assertEquals(updatedPaymentDtos.getFirst().blockHash(), invoicePaymentRepository.findAll().getFirst().getBlockHash());
+        Assertions.assertEquals(paymentDtos.getFirst().blockHash(), invoicePaymentRepository.findAll().getFirst().getBlockHash());
+        Assertions.assertEquals(paymentDtos.getFirst().blockNumber(), invoicePaymentRepository.findAll().getFirst().getBlockNumber());
+    }
+
+    @Test
+    public void updateShouldNotCreateNewEntry() {
+        String id = random(66);
+
+        Assertions.assertEquals(0, invoicePaymentRepository.findAll().size());
+
+        List<InvoicePaymentDto> paymentDtos = List.of(
+                new InvoicePaymentDto(id, BigInteger.valueOf(1), random(66))
+        );
+
+        invoicePaymentService.update(paymentDtos);
+        Assertions.assertEquals(0, invoicePaymentRepository.findAll().size());
     }
 
     @Test
