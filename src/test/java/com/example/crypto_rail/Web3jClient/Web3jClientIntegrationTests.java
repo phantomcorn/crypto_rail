@@ -421,4 +421,127 @@ public class Web3jClientIntegrationTests {
             Assertions.assertEquals(expectedBlock.getHash(), resp.getHash());
         }
     }
+
+    @Test
+    public void startProcessingBlockBeforeForkHandlesReorgOK() throws IOException {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
+        mockChain(view.before());// current view of chain
+
+        NewHead startingBlock = normalChain.get(0).getParams().getResult();
+        Assertions.assertTrue(Numeric.toBigInt(startingBlock.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) < 0);
+        //Start processing block before fork
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after()); //switch view
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(web3j).ethGetLogs(argThat(filter -> {
+            if (filter.getFromBlock() == null && filter.getToBlock() == null) {
+                return false;
+            }
+
+            return filter.getFromBlock().getValue().equals(commonAncestor.getNumber()) &&
+                    filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue()) &&
+                    filter.getAddress().get(0).equals(Web3jClient.CRYPTO_RAIL_ADDRESS);
+        }
+        ));
+        verify(web3jClientTestAdapter, never()).onError(any());
+    }
+
+    @Test
+    public void startProcessingBlockAfterForkHandlesReorgOK() throws IOException {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+
+        int startingIndex = 7;
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain(), startingIndex);
+
+        NewHead startingBlock = normalChain.get(7).getParams().getResult();
+        Assertions.assertTrue(Numeric.toBigInt(startingBlock.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) > 0);
+
+        //Start processing block before fork
+        mockChain(view.before());
+        for (int i = startingIndex; i < normalChain.size(); i++) {
+            newHeadPublisher.onNext(normalChain.get(i));
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4));//trigger reorg
+        verify(web3jClientTestAdapter, never()).onError(any());
+    }
+
+    @Test
+    public void aReorgRevertsEveryPaymentBetweenCommonAncestorAndLatestNotOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> normalChainWithLogs = new ArrayList<>();
+
+        String invoiceToRevert = Hash.sha3String(UUID.randomUUID().toString());
+        String invoiceDoesntRevert = Hash.sha3String(UUID.randomUUID().toString());
+
+        NewHead inBlock = null;
+        for (NewHeadsNotification notification: normalChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceToRevert)));
+                inBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceDoesntRevert)));
+            } else {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        ChainViewBeforeAfterReorg view = setupReorg(normalChainWithLogs, setupForkChain());
+        Assertions.assertNotNull(inBlock); //There is a payment after or in commonAncestor
+
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(invoiceService).revertAll(List.of(invoiceToRevert));
+        verify(invoicePaymentService).removeAllById(List.of(invoiceToRevert));
+        verify(invoiceService, never()).revertAll(List.of(invoiceDoesntRevert));
+        verify(invoicePaymentService, never()).removeAllById(List.of(invoiceDoesntRevert));
+    }
+
+    @Test
+    public void aReorgAddNewPaymentOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> forkChainWithLogs = new ArrayList<>();
+
+        String newInvoiceIdInFork = Hash.sha3String(UUID.randomUUID().toString());
+
+        for (NewHeadsNotification notification: reorgChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(newInvoiceIdInFork)));
+            } else if (containsPaymentEvent(head)) {
+                Assertions.fail(); //reorg-blocks.json blocks always start after common ancestor
+            } else {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), forkChainWithLogs);
+
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(invoiceService).detectPaymentAll(List.of(newInvoiceIdInFork));
+    }
+
+    @Test
+    public void aReorgUpdatePaymentToADifferentBlockOnTheForkChain() {
+
+    }
+    
 }
+
