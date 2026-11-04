@@ -78,6 +78,9 @@ public class Web3jClientIntegrationTests {
     @MockitoSpyBean
     InvoiceService invoiceService;
 
+    @Autowired
+    AutowireCapableBeanFactory beanFactory;
+
     public void mockEthGetLogs(List<EthLog.LogResult> logs) throws IOException {
 
         doAnswer(inv -> {
@@ -251,12 +254,8 @@ public class Web3jClientIntegrationTests {
 
     @BeforeEach
     public void buildClient() throws URISyntaxException, ConnectException {
-        newHeadPublisher = PublishProcessor.create();
-        web3jClientTestAdapter = new Web3jClientTestAdapter(newHeadPublisher);
-        web3jClient = new Web3jClient(web3jClientTestAdapter);
-        ReflectionTestUtils.setField(web3jClient, "web3j", web3j);
-        ReflectionTestUtils.setField(web3jClient, "invoiceService", invoiceService);
-        ReflectionTestUtils.setField(web3jClient, "invoicePaymentService", invoicePaymentService);
+        web3jClient = new Web3jClient(web3jClientTestAdapter); //instantiating it like this does not go through autowired
+        beanFactory.autowireBean(web3jClient); //which is why we autowire them manually
     }
 
     @Test
