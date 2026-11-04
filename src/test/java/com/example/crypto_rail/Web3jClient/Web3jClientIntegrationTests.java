@@ -539,8 +539,53 @@ public class Web3jClientIntegrationTests {
     }
 
     @Test
-    public void aReorgUpdatePaymentToADifferentBlockOnTheForkChain() {
+    public void aReorgUpdatePaymentToADifferentBlockOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> normalChainWithLogs = new ArrayList<>();
+        List<NotificationWithLogs> forkChainWithLogs = new ArrayList<>();
 
+        String invoiceIdWillUpdate = Hash.sha3String(UUID.randomUUID().toString());
+        String invoiceRemainedOnBlock = Hash.sha3String(UUID.randomUUID().toString());
+        NewHead oldBlock = null;
+        NewHead newBlock = null;
+
+        for (NewHeadsNotification notification: normalChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceIdWillUpdate)));
+                oldBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceRemainedOnBlock)));
+            } else {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        for (NewHeadsNotification notification: reorgChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceIdWillUpdate)));
+                newBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceRemainedOnBlock)));
+            } else {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        Assertions.assertNotNull(oldBlock);
+        Assertions.assertNotNull(newBlock);
+
+        ChainViewBeforeAfterReorg view = setupReorg(normalChainWithLogs, forkChainWithLogs);
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+
+        Mockito.verify(invoicePaymentService).update(List.of(new InvoicePaymentDto(invoiceIdWillUpdate, Numeric.toBigInt(newBlock.getNumber()), newBlock.getHash())));
     }
     
 }
