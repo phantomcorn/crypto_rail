@@ -1,5 +1,6 @@
 package com.example.crypto_rail.entity;
 
+import com.example.crypto_rail.dto.MerchantDto;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -20,4 +21,11 @@ public class Merchant {
 
     @Column(name = "name")
     private String name;
+
+    @Column(name = "uri")
+    private String uri;
+
+    public MerchantDto toDto() {
+        return new MerchantDto(address, name, uri);
+    }
 }
