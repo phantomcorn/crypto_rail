@@ -1,4 +1,4 @@
-package com.example.crypto_rail.request;
+package com.example.crypto_rail.dto.request;
 
 import lombok.Data;
 

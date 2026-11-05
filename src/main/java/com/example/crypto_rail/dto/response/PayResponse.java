@@ -1,4 +1,4 @@
-package com.example.crypto_rail.response;
+package com.example.crypto_rail.dto.response;
 
 import com.example.crypto_rail.dto.InvoiceDto;
 

@@ -2,9 +2,8 @@ package com.example.crypto_rail.controller;
 
 import com.example.crypto_rail.dto.InvoiceDto;
 import com.example.crypto_rail.dto.PayRequestDto;
-import com.example.crypto_rail.entity.Invoice;
-import com.example.crypto_rail.request.PayRequest;
-import com.example.crypto_rail.response.PayResponse;
+import com.example.crypto_rail.dto.request.PayRequest;
+import com.example.crypto_rail.dto.response.PayResponse;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.utils.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
