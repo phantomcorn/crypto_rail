@@ -2,8 +2,10 @@ package com.example.crypto_rail.utils.webhooks;
 
 import com.example.crypto_rail.entity.Status;
 import lombok.Builder;
+import lombok.Getter;
 
 @Builder
+@Getter
 public class EventMessage {
 
     String merchantAddress;

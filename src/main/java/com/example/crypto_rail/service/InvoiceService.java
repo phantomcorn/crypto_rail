@@ -8,6 +8,8 @@ import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.dto.response.PayResponse;
 import com.example.crypto_rail.utils.dto.NewSignatureDto;
 import com.example.crypto_rail.utils.Web3jClient;
+import com.example.crypto_rail.utils.webhooks.EventInbox;
+import com.example.crypto_rail.utils.webhooks.EventMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class InvoiceService {
@@ -32,6 +35,9 @@ public class InvoiceService {
 
     @Autowired
     Credentials credentials;
+
+    @Autowired
+    EventInbox inbox;
 
     @Value("${checkout-base-url}")
     private String CHECKOUT_BASE_URL;
@@ -87,14 +93,22 @@ public class InvoiceService {
 
         List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.NOT_PAID, Status.DETECTED);
-        //TODO: publish event
-        return changes > 0;
+
+        assert(changes == lockedInvoices.size());
+        lockedInvoices.forEach(invoice ->
+                inbox.getPublisher().onNext(
+                        EventMessage.builder()
+                                .invoiceId(invoice.getHashId())
+                                .merchantAddress(invoice.getMerchantAddress())
+                                .status(Status.DETECTED)
+                                .build()
+                )
+        );
+        return true;
     }
 
     @Transactional
     public boolean toFinality(List<String> hashIds) {
-        List<String> lockedIds = invoiceRepository.lockByStatus(hashIds, Status.DETECTED);
-        if (lockedIds.isEmpty()) {
         List<Invoice> lockedInvoices = invoiceRepository.lockByStatus(hashIds, Status.DETECTED);
         if (lockedInvoices.isEmpty()) {
             return false;
@@ -102,8 +116,18 @@ public class InvoiceService {
 
         List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.CONFIRMED);
-        //TODO: publish event
-        return changes > 0;
+
+        assert(changes == lockedIds.size());
+        lockedInvoices.forEach(invoice ->
+                inbox.getPublisher().onNext(
+                        EventMessage.builder()
+                                .invoiceId(invoice.getHashId())
+                                .merchantAddress(invoice.getMerchantAddress())
+                                .status(Status.CONFIRMED)
+                                .build()
+                )
+        );
+        return true;
     }
 
     @Transactional
@@ -120,7 +144,17 @@ public class InvoiceService {
 
         List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.REORG);
-        //TODO: publish event
-        return changes > 0;
+
+        assert(changes == lockedInvoices.size());
+        lockedInvoices.forEach(invoice ->
+                inbox.getPublisher().onNext(
+                        EventMessage.builder()
+                                .invoiceId(invoice.getHashId())
+                                .merchantAddress(invoice.getMerchantAddress())
+                                .status(Status.REORG)
+                                .build()
+                )
+        );
+        return true;
     }
 }
