@@ -1,6 +1,18 @@
 # crypto_rail
 Crypto payment gateway using Spring Boot API and Web3j watcher
 
+## TODO
+[x] Merchant generates invoice by calling our backend server using REST API
+[x] Server returns checkout page
+[x] Connect wallet to checkout page
+[x] Connected wallet can pay using the pay button
+[x] Detect PaymentRecieved from our contract on the blockchain and update invoice status
+[] Any invoice status update sends message to inbox
+[] Inbox fetches message, creates, signs and sends webhook to merchant endpoint
+[] Display merchant address as QR code
+[] Monitor token Transfer event incase buyer transfer directly to merchant address using QR code
+[] Detect Transfer event from token contract on the blockchain and update invoice status
+
 ## Features
 - `PaymentRail.sol` contract acts as a non-custodial intermediary between buyer and seller leveraging DLT.
 - Support standard ERC20 token.
@@ -25,7 +37,24 @@ Crypto payment gateway using Spring Boot API and Web3j watcher
     2. Secondly, `pay(bytes32 invoiceId, address token, uint amount, address merchantAddr, uint deadline, bytes signature, bytes32 digest)` 
         - More on `pay` below
         - The `signature` and the `digest` here is computed by the server in the step 2.
-5. Merchant service spawns multiple web3j watcher during startup watches the chain for the invoice paid event. 
+5. Web3j client subscribes to an ethereum websocket and watches for new block:
+
+    - Check for reorg:
+        - Check whether new block's parent hash points to most recent processed block
+        - Yes -> Continue
+        - No -> Handle reorg
+
+    - Every new head checks for existence of our contract address and `PaymentReceived` event using the bloom filter
+    - If it doesn't we simply -> Do nothing
+    - If it does -> Grab the logs and scan for all invoice ID. Update status of these invoice to `DETECTED`. Mark that this invoice payment has been done under this block (block number, block hash)
+    - Find all invoice that can be updated to `CONFIRMED` by checking whether
+    ```
+    new block number - block number where our invoice payment was done > N
+    ```
+    This essentially means there are enough new blocks built ontop that we can guarantee a reorg is very unlikely to happen.
+    - Mark this block (block number, block hash) as processed
+
+
     - The merchant service and the watcher shares a cryptographic key.
     - Once confirmed, watcher triggers a webhook which our merchant server recieves and update it states. Our frontend polls for changes in our server and directs to a confirmation page when succeed.
     - To make sure the merchant server recieves webhook from the real watcher, a hash of the request is also sent along with the request. The merchant server recalculates the hash using its shared key and compares. If same, real watcher else reject.
