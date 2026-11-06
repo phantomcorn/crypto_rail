@@ -80,11 +80,12 @@ public class InvoiceService {
 
     @Transactional
     public boolean detectPaymentAll(List<String> hashIds) {
-        List<String> lockedIds = invoiceRepository.lockByStatus(hashIds, Status.NOT_PAID);
-        if (lockedIds.isEmpty()) {
+        List<Invoice> lockedInvoices = invoiceRepository.lockByStatus(hashIds, Status.NOT_PAID);
+        if (lockedInvoices.isEmpty()) {
             return false;
         }
 
+        List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.NOT_PAID, Status.DETECTED);
         //TODO: publish event
         return changes > 0;
@@ -94,9 +95,12 @@ public class InvoiceService {
     public boolean toFinality(List<String> hashIds) {
         List<String> lockedIds = invoiceRepository.lockByStatus(hashIds, Status.DETECTED);
         if (lockedIds.isEmpty()) {
+        List<Invoice> lockedInvoices = invoiceRepository.lockByStatus(hashIds, Status.DETECTED);
+        if (lockedInvoices.isEmpty()) {
             return false;
         }
 
+        List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.CONFIRMED);
         //TODO: publish event
         return changes > 0;
@@ -109,11 +113,12 @@ public class InvoiceService {
 
     @Transactional
     public boolean revertAll(List<String> droppedHashIds) {
-        List<String> lockedIds = invoiceRepository.lockByStatus(droppedHashIds, Status.DETECTED);
-        if (lockedIds.isEmpty()) {
+        List<Invoice> lockedInvoices = invoiceRepository.lockByStatus(droppedHashIds, Status.DETECTED);
+        if (lockedInvoices.isEmpty()) {
             return false;
         }
 
+        List<String> lockedIds = lockedInvoices.stream().map(Invoice::getHashId).toList();
         int changes = invoiceRepository.transition(lockedIds, Status.DETECTED, Status.REORG);
         //TODO: publish event
         return changes > 0;

@@ -33,13 +33,13 @@ public interface InvoiceRepository extends JpaRepository<Invoice, String> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-        SELECT i.hashId
+        SELECT i
         FROM Invoice i
         WHERE i.hashId IN :hashIds
         AND i.status = :from
         ORDER BY i.hashId
         """)
-    List<String> lockByStatus(List<String> hashIds, Status from);
+    List<Invoice> lockByStatus(List<String> hashIds, Status from);
 }
 
 

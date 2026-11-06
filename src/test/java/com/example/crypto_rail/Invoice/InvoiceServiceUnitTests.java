@@ -5,13 +5,19 @@ import com.example.crypto_rail.entity.Status;
 import com.example.crypto_rail.repository.InvoiceRepository;
 import com.example.crypto_rail.service.InvoiceService;
 import com.example.crypto_rail.utils.Web3jClient;
+import com.example.crypto_rail.utils.webhooks.EventInbox;
+import com.example.crypto_rail.utils.webhooks.EventMessage;
+import io.reactivex.processors.PublishProcessor;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.web3j.crypto.Hash;
 
 import java.math.BigInteger;
@@ -22,6 +28,7 @@ import java.util.UUID;
 import static org.apache.logging.log4j.util.Strings.repeat;
 import static org.mockito.Mockito.*;
 
+@MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
 public class InvoiceServiceUnitTests {
 
@@ -31,13 +38,16 @@ public class InvoiceServiceUnitTests {
     @Mock
     InvoiceRepository invoiceRepository;
 
+    @Mock
+    EventInbox inbox;
+
     String INVALID_HASH_ID = "0x" + repeat("ff", 32);
     String VALID_HASH_ID = "0x" + repeat("ab", 32);
     Invoice UNPAID_INVOICE;
     Invoice DETECTED_INVOICE;
     Invoice REORG_INVOICE;
     Invoice CONFIRMED_INVOICE;
-
+    PublishProcessor<EventMessage> publisher;
 
     public InvoiceServiceUnitTests() {
         String uuid = UUID.randomUUID().toString();
@@ -84,11 +94,13 @@ public class InvoiceServiceUnitTests {
                 .chainId(Web3jClient.CHAIN_ID)
                 .status(Status.CONFIRMED)
                 .build();
+        publisher = PublishProcessor.create();
 
     }
 
-    public String randomHashId() {
-        return Hash.sha3String(UUID.randomUUID().toString());
+    @BeforeEach
+    public void initPublisher() {
+        when(inbox.getPublisher()).thenReturn(publisher);
     }
 
     @Test
@@ -109,8 +121,8 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void detectPaymentOnExistingInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(VALID_HASH_ID));
-        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId()), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.detectPayment(VALID_HASH_ID));
     }
 
@@ -137,8 +149,8 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void detectPaymentOnlyProcessUnpaidInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(VALID_HASH_ID));
-        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.NOT_PAID)).thenReturn(List.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId()), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.detectPayment(VALID_HASH_ID));
     }
 
@@ -150,8 +162,8 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void revertOnExistingInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(VALID_HASH_ID));
-        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.DETECTED, Status.REORG)).thenReturn(1);
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId()), Status.DETECTED, Status.REORG)).thenReturn(1);
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
@@ -178,15 +190,16 @@ public class InvoiceServiceUnitTests {
 
     @Test
     public void revertOnlyProcessDetectedInvoiceWillReturnTrue() {
-        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(VALID_HASH_ID));
-        Mockito.when(invoiceRepository.transition(List.of(VALID_HASH_ID), Status.DETECTED, Status.REORG)).thenReturn(1);
+        Mockito.when(invoiceRepository.lockByStatus(List.of(VALID_HASH_ID), Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE));
+        Mockito.when(invoiceRepository.transition(List.of(DETECTED_INVOICE.getHashId()), Status.DETECTED, Status.REORG)).thenReturn(1);
         Assertions.assertTrue(invoiceService.revert(VALID_HASH_ID));
     }
 
     @Test
     public void detectPaymentAllWithAllUnpaidInvoiceWillReturnTrue() {
-        List<String> ids = List.of(UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(ids);
+        List<Invoice> invoices = List.of(UNPAID_INVOICE, UNPAID_INVOICE, UNPAID_INVOICE, UNPAID_INVOICE);
+        List<String> ids = invoices.stream().map(Invoice::getHashId).toList();
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(invoices);
         Mockito.when(invoiceRepository.transition(ids, Status.NOT_PAID, Status.DETECTED)).thenReturn(ids.size());
         Assertions.assertTrue(invoiceService.detectPaymentAll(ids));
     }
@@ -202,15 +215,16 @@ public class InvoiceServiceUnitTests {
     @Test
     public void detectPaymentAllWillOnlyUpdateUnpaidInvoice() {
         List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(List.of(UNPAID_INVOICE.getHashId(),UNPAID_INVOICE.getHashId()));
-        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId(),UNPAID_INVOICE.getHashId()), Status.NOT_PAID, Status.DETECTED)).thenReturn(2);
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.NOT_PAID)).thenReturn(List.of(UNPAID_INVOICE));
+        Mockito.when(invoiceRepository.transition(List.of(UNPAID_INVOICE.getHashId()), Status.NOT_PAID, Status.DETECTED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.detectPaymentAll(ids));
     }
 
     @Test
     public void toFinalityWithAllDetectedInvoiceWillReturnTrue() {
-        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(ids);
+        List<Invoice> invoices = List.of(DETECTED_INVOICE, DETECTED_INVOICE, DETECTED_INVOICE, DETECTED_INVOICE);
+        List<String> ids = invoices.stream().map(Invoice::getHashId).toList();
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(invoices);
         Mockito.when(invoiceRepository.transition(ids, Status.DETECTED, Status.CONFIRMED)).thenReturn(ids.size());
         Assertions.assertTrue(invoiceService.toFinality(ids));
     }
@@ -226,15 +240,16 @@ public class InvoiceServiceUnitTests {
     @Test
     public void toFinalityWillOnlyUpdateOnDetectedInvoice() {
         List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE.getHashId()));
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE));
         Mockito.when(invoiceRepository.transition(List.of(DETECTED_INVOICE.getHashId()), Status.DETECTED, Status.CONFIRMED)).thenReturn(1);
         Assertions.assertTrue(invoiceService.toFinality(ids));
     }
 
     @Test
     public void revertAllWithAllDetectedInvoiceWillReturnTrue() {
-        List<String> ids = List.of(DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId(), DETECTED_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(ids);
+        List<Invoice> invoices = List.of(DETECTED_INVOICE, DETECTED_INVOICE, DETECTED_INVOICE, DETECTED_INVOICE);
+        List<String> ids = invoices.stream().map(Invoice::getHashId).toList();
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(invoices);
         Mockito.when(invoiceRepository.transition(ids, Status.DETECTED, Status.REORG)).thenReturn(ids.size());
         Assertions.assertTrue(invoiceService.revertAll(ids));
     }
@@ -250,7 +265,7 @@ public class InvoiceServiceUnitTests {
     @Test
     public void revertAllWillOnlyUpdateOnDetectedInvoice() {
         List<String> ids = List.of(DETECTED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId(), CONFIRMED_INVOICE.getHashId(), UNPAID_INVOICE.getHashId());
-        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE.getHashId()));
+        Mockito.when(invoiceRepository.lockByStatus(ids, Status.DETECTED)).thenReturn(List.of(DETECTED_INVOICE));
         Mockito.when(invoiceRepository.transition(List.of(DETECTED_INVOICE.getHashId()), Status.DETECTED, Status.REORG)).thenReturn(1);
         Assertions.assertTrue(invoiceService.revertAll(ids));
     }
