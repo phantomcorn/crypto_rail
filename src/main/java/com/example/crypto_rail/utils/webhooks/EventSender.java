@@ -1,5 +1,7 @@
 package com.example.crypto_rail.utils.webhooks;
 
+import com.example.crypto_rail.dto.MerchantDto;
+import com.example.crypto_rail.utils.HMacUtil;
 import io.vertx.core.json.JsonObject;
 import org.springframework.stereotype.Component;
 
@@ -13,25 +15,24 @@ import java.util.concurrent.CompletableFuture;
 public class EventSender {
 
 
-    public void send(String invoiceId, InvoiceEventStatus invoiceEventStatus, String uri) {
-
+    public void send(String invoiceId, InvoiceEventStatus invoiceEventStatus, MerchantDto merchantDto) {
         HttpClient httpClient = HttpClient.newBuilder().build();
 
-
-        HttpRequest request = webhookRequest(invoiceId, invoiceEventStatus, uri);
+        HttpRequest request = webhookRequest(invoiceId, invoiceEventStatus, merchantDto);
         CompletableFuture<HttpResponse<String>> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-
     }
 
-    public HttpRequest webhookRequest(String invoiceId, InvoiceEventStatus status, String uri) {
-        //compute secret
-
+    public HttpRequest webhookRequest(String invoiceId, InvoiceEventStatus status, MerchantDto merchantDto) {
         JsonObject body = new JsonObject();
         body.put("invoiceId", invoiceId);
         body.put("status", status.name());
 
+        String jsonPayload = body.toString();
+        String signature = HMacUtil.sign(merchantDto.secretKey(), jsonPayload);
+        body.put("signature", signature);
+
         return HttpRequest.newBuilder()
-                .uri(URI.create(uri + "/webhook/event"))
+                .uri(URI.create(merchantDto.uri() + "/webhook/event"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
