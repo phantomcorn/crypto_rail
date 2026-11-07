@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -27,7 +28,7 @@ public class EventSender {
         body.put("invoiceId", invoiceId);
         body.put("status", status.name());
 
-        String jsonPayload = body.toString();
+        Map<String, Object> jsonPayload = body.getMap();
         String signature = HMacUtil.sign(merchantDto.secretKey(), jsonPayload);
         body.put("signature", signature);
 

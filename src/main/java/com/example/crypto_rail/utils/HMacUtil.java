@@ -2,36 +2,36 @@ package com.example.crypto_rail.utils;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 public class HMacUtil {
 
-    public static String sign(String keyString, String jsonPayload) {
+    public static String sign(String key, Map<String, Object> jsonPayload) {
 
-        SecretKey key = Keys.hmacShaKeyFor(keyString.getBytes(StandardCharsets.UTF_8));
+        SecretKey secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(key));
 
         return Jwts.builder()
-                .header().contentType("application/json")
-                .and()
-                .content(jsonPayload)
-                .signWith(key, Jwts.SIG.HS256)
+                .claims(jsonPayload)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 
-    public static boolean verify(String signature, String keyString) {
+    public static boolean verify(String signature, String key) {
 
-        SecretKey key = Keys.hmacShaKeyFor(keyString.getBytes(StandardCharsets.UTF_8));
+        SecretKey secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(key));
 
         try {
             Jwts.parser()
-                    .verifyWith(key)
+                    .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(signature);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
+            e.printStackTrace();
             return false;
         }
     }
