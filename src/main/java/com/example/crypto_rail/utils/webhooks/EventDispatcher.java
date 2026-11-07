@@ -32,7 +32,7 @@ public class EventDispatcher { //subscriber to EventInbox
             //TODO: raise error (this handler should only be called when event updates i.e must have merchant entity)
         }
         MerchantDto merchant = found.get();
-        sender.send(message.invoiceId, EventMessage.statusToInvoiceEventStatus(message.status), merchant.uri());
+        sender.send(message.invoiceId, EventMessage.statusToInvoiceEventStatus(message.status), merchant);
     }
 
     public void onError(Throwable err) {

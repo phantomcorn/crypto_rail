@@ -1,5 +1,6 @@
 package com.example.crypto_rail;
 
+import com.example.crypto_rail.dto.MerchantDto;
 import com.example.crypto_rail.entity.Status;
 import com.example.crypto_rail.service.MerchantService;
 import com.example.crypto_rail.utils.webhooks.EventDispatcher;
@@ -34,6 +35,7 @@ public class WebhooksIntegrationTest {
     EventSender sender;
 
     EventDispatcher dispatcher;
+    String merchantAddress = "0x1111111111111111111111111111111111111111";
 
     @BeforeEach
     public void buildDispatcher() {
@@ -64,16 +66,18 @@ public class WebhooksIntegrationTest {
     public void dispatcherHandlerSendsRequest() {
         EventMessage message = EventMessage
                 .builder()
-                .merchantAddress("0x1111111111111111111111111111111111111111")
+                .merchantAddress(merchantAddress)
                 .invoiceId(Hash.sha3String(UUID.randomUUID().toString()))
                 .status(Status.DETECTED)
                 .build();
+
+        MerchantDto merchantDto = merchantService.findMerchantByAddress(merchantAddress).get();
 
         inbox.getPublisher().onNext(message);
         Mockito.verify(sender).send(
                 message.getInvoiceId(),
                 EventMessage.statusToInvoiceEventStatus(message.getStatus()),
-                "https://www.google.com"
+                merchantDto
         );
     }
 }

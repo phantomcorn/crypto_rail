@@ -25,7 +25,10 @@ public class Merchant {
     @Column(name = "uri")
     private String uri;
 
+    @Column(name = "secretKey")
+    private String secretKey; //signing webhooks
+
     public MerchantDto toDto() {
-        return new MerchantDto(address, name, uri);
+        return new MerchantDto(address, name, uri, secretKey);
     }
 }
