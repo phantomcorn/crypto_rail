@@ -1,14 +1,16 @@
 package com.example.crypto_rail.utils.webhooks;
 
 import com.example.crypto_rail.dto.MerchantDto;
-import com.example.crypto_rail.dto.request.InvoiceEventRequest;
 import com.example.crypto_rail.service.MerchantService;
+import io.reactivex.disposables.Disposable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 @Component
+@Profile("!test")
 public class EventDispatcher { //subscriber to EventInbox
 
     @Autowired
@@ -16,8 +18,11 @@ public class EventDispatcher { //subscriber to EventInbox
 
     @Autowired
     EventSender sender;
+
+    Disposable disposable;
+
     public EventDispatcher(EventInbox inbox) {
-        inbox.getPublisher().subscribe(this::handler, this::onError);
+        disposable = inbox.getPublisher().subscribe(this::handler, this::onError);
     }
 
     public void handler(EventMessage message) {
@@ -32,6 +37,10 @@ public class EventDispatcher { //subscriber to EventInbox
 
     public void onError(Throwable err) {
         err.printStackTrace();
+    }
+
+    public void dispose() {
+        disposable.dispose();
     }
 
 
