@@ -5,6 +5,7 @@ import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
 import type { MockERC20 } from "../types/ethers-contracts/MockERC20.js";
 import { upgrades } from '@openzeppelin/hardhat-upgrades';
 import hre from "hardhat";
+import type { PaymentRailV2 } from "../types/ethers-contracts/PaymentRailV2.js";
 const connection = await hre.network.create();
 const { ethers, networkHelpers } = connection;
 const upgradesApi = await upgrades(hre, connection);
@@ -93,7 +94,7 @@ async function approveAndPay(
 
 describe("PaymentRail", function () {
 
-  let gateway: PaymentRail
+  let gateway: PaymentRailV2
   let token: MockERC20
   let owner: HardhatEthersSigner
   let buyer: HardhatEthersSigner
@@ -102,7 +103,7 @@ describe("PaymentRail", function () {
   beforeEach(async () => {
     [owner, buyer, merchant] = await ethers.getSigners()
 
-    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
+    const gatewayFactory = await ethers.getContractFactory("PaymentRailV2");
     gateway = await upgradesApi.deployProxy(gatewayFactory, [], {kind: "uups"})
     token = await ethers.deployContract("MockERC20");
     await token.mint(buyer.address, TRANSFER_AMOUNT);
