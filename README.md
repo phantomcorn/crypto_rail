@@ -2,18 +2,21 @@
 Crypto payment gateway using Spring Boot API and Web3j watcher
 
 ## TODO
-[x] Merchant generates invoice by calling our backend server using REST API
-[x] Server returns checkout page
-[x] Connect wallet to checkout page
-[x] Connected wallet can pay using the pay button
-[x] Detect PaymentRecieved from our contract on the blockchain and update invoice status
-[x] Any invoice status update sends message to inbox
-[x] Endpoint to register merchant
-[x] KMS for signed webhooks
-[x] Inbox fetches message, creates, signs and sends webhook to merchant endpoint
-[] Display merchant address as QR code
-[] Monitor token Transfer event incase buyer transfer directly to merchant address using QR code
-[] Detect Transfer event from token contract on the blockchain and update invoice status
+### Features
+- [x] Merchant generates invoice by calling our backend server using REST API
+- [x] Server returns checkout page
+- [x] Connect wallet to checkout page
+- [x] Connected wallet can pay using the pay button
+- [x] Detect PaymentRecieved from our contract on the blockchain and update invoice status
+- [x] Any invoice status update sends message to inbox
+- [x] Endpoint to register merchant
+- [x] KMS for signed webhooks
+- [x] Inbox fetches message, creates, signs and sends webhook to merchant endpoint
+- [ ] Display merchant address as QR code
+- [ ] Monitor token Transfer event incase buyer transfer directly to merchant address using QR code
+- [ ] Detect Transfer event from token contract on the blockchain and update invoice status
+### Edge cases
+- [ ] Buyer clicks pay 1 second before expiry, contract `block.timestamp` shows expired. Transaction reverts + gas fee paid
 
 ## Features
 - `PaymentRail.sol` contract acts as a non-custodial intermediary between buyer and seller leveraging DLT.
