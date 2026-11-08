@@ -9,7 +9,7 @@ spring:
   flyway:
     enabled: false
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       ddl-auto: create-drop
     defer-datasource-initialization: true
@@ -23,5 +23,5 @@ spring:
 rpc:
   endpoint-url: "https://eth-sepolia.g.alchemy.com/v2/alch_dC-N1oQkucc4aRmNyBCf9"
 sepolia:
-  private-key: "69995f58e4cb3555ec53d95b7e734009aac1f6b8df14a87e78fece2ae34e3daa"
+  private-key: "11111111111111111111111111111111111111111111"
 checkout-base-url: "http://localhost:8080"
