@@ -33,7 +33,7 @@ public class EventSender {
         body.put("signature", signature);
 
         return HttpRequest.newBuilder()
-                .uri(URI.create(merchantDto.uri() + "/webhook/event"))
+                .uri(URI.create(merchantDto.uri()))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
