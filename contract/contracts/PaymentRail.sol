@@ -1,43 +1,34 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity^0.8.0;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Invoice, EIP712Domain, PaymentReceived} from "./Types.sol";
 
 interface IERC20 {
     function transferFrom(address from, address to, uint256 value) external returns (bool);
 }
 
-contract PaymentRail is Ownable {
+contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     address public serverAddr;
-    mapping(bytes32 => bool) private hasPaid;
+    mapping(bytes32 => bool) hasPaid;
 
-    event PaymentReceived(bytes32 indexed invoiceId);
-
-    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
+    bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
     );
 
-    bytes32 private constant MESSAGE_TYPEHASH = keccak256(
+    bytes32 constant MESSAGE_TYPEHASH = keccak256(
         "Invoice(bytes32 id,address tokenAddr,uint256 amount,address merchantAddr,uint256 deadline)"
     );
-    struct Invoice {
-        bytes32 id;
-        address tokenAddr;
-        uint amount;
-        address merchantAddr;
-        uint deadline;
-    }
-    struct EIP712Domain {
-        string name;
-        string version;
-        uint256 chainId;
-        address verifyingContract;
+
+    function initialize() initializer public {
+        __Ownable_init(msg.sender);
     }
 
-    constructor() Ownable(msg.sender) {}
 
-    function pay(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature) external {
+    function pay(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature) virtual external {
         require(!hasPaid[invoice.id], "Invoice already paid");
         require(invoice.deadline >= block.timestamp, "Signature expired");
 
@@ -98,4 +89,5 @@ contract PaymentRail is Ownable {
         );
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
