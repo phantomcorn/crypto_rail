@@ -10,8 +10,8 @@ const connection = await hre.network.create();
 const { ethers, networkHelpers } = connection;
 const upgradesApi = await upgrades(hre, connection);
 
-const TRUSTED_SERVER_ADDR = "0x0123456789023456789001234567890234567890"
-const UNTRUSTED_SERVER_ADDR = "0x9876543210987654321098765432109876543210"
+const TRUSTED_SIGNER_ADDR = "0x0123456789023456789001234567890234567890"
+const UNTRUSTED_SIGNER_ADDR = "0x9876543210987654321098765432109876543210"
 const REAL_NETWORK = 1
 const FAKE_NETWORK = 11155111
 const TRANSFER_AMOUNT = 30;
@@ -22,20 +22,10 @@ const TAMPERED_TOKEN_ADDR = "0xf531B8F309be94191af87605cfbf600d71c2cfe0".toLower
 const TAMPERED_AMOUNT = 99
 const TAMPERD_MERCHANT_ADDR = Wallet.createRandom().address
 
-// async function deploySystem() {
-//   const [owner, buyer, merchant] = await ethers.getSigners()
-//   const token = await ethers.deployContract("MockERC20");
-//   await token.mint(buyer.address, TRANSFER_AMOUNT);
-//   const gateway = await ethers.deployContract("PaymentRail");
-//   await gateway.initialize();
-//   await gateway.setServerAddr(owner.address);
-//   return {buyer, merchant, owner, token, gateway}
-// }
-
 async function serverCreateInvoice( 
   invoiceId: string,
   amount: number,
-  owner: HardhatEthersSigner,
+  signer: HardhatEthersSigner,
   token: MockERC20, 
   merchant: HardhatEthersSigner, 
   gateway: PaymentRail,
@@ -73,7 +63,7 @@ async function serverCreateInvoice(
     merchantAddr: await merchant.getAddress(),
     deadline: await networkHelpers.time.latest() + FIVE_MINUTES
   }
-  const signature = await owner.signTypedData(domain, types, value)
+  const signature = await signer.signTypedData(domain, types, value)
   return {signature, value, domain, types}
 }
 
@@ -97,18 +87,17 @@ describe("PaymentRail", function () {
   let gateway: PaymentRailV2
   let token: MockERC20
   let owner: HardhatEthersSigner
+  let signer: HardhatEthersSigner
   let buyer: HardhatEthersSigner
   let merchant: HardhatEthersSigner;
 
   beforeEach(async () => {
-    [owner, buyer, merchant] = await ethers.getSigners()
+    [owner, buyer, merchant, signer] = await ethers.getSigners()
 
     const gatewayFactory = await ethers.getContractFactory("PaymentRailV2");
-    gateway = await upgradesApi.deployProxy(gatewayFactory, [], {kind: "uups"})
+    gateway = await upgradesApi.deployProxy(gatewayFactory, [signer.address], {kind: "uups"})
     token = await ethers.deployContract("MockERC20");
     await token.mint(buyer.address, TRANSFER_AMOUNT);
-
-    await gateway.setServerAddr(owner.address);
   })
 
 
@@ -116,15 +105,15 @@ describe("PaymentRail", function () {
     const gateway = await ethers.deployContract("PaymentRail");
   });
 
-  it("can deploy proxy on PaymentRail", async function() {
+  it("Can deploy proxy on PaymentRail", async function() {
     const gatewayFactory = await ethers.getContractFactory("PaymentRail");
-    const gateway = await upgradesApi.deployProxy(gatewayFactory, [], {kind: 'uups'})
+    const gateway = await upgradesApi.deployProxy(gatewayFactory, [signer.address], {kind: 'uups'})
   })
 
   it("Upgrading contract retains the same address", async function() {
     const gatewayFactory = await ethers.getContractFactory("PaymentRail");
     const v1Impl = await gatewayFactory.deploy()
-    const v1 = await upgradesApi.deployProxy(gatewayFactory, [], {kind: 'uups'})
+    const v1 = await upgradesApi.deployProxy(gatewayFactory, [signer.address], {kind: 'uups'})
 
     const gatewayFactoryV2 = await ethers.getContractFactory("PaymentRailV2");
     const v2Impl = await gatewayFactoryV2.deploy()
@@ -140,14 +129,19 @@ describe("PaymentRail", function () {
     expect(await gateway.owner()).is.not.equals(merchant.address)
   })
 
-  it("Only owner can set the trusted server address", async function() {
+  it("Only owner can set the trusted signer", async function() {
     expect(await gateway.owner()).equals(owner.address);
-    expect(await gateway.connect(owner).setServerAddr(TRUSTED_SERVER_ADDR))
-    await expect(gateway.connect(buyer).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
+    expect(await gateway.connect(owner).setSigner(TRUSTED_SIGNER_ADDR))
+    await expect(gateway.connect(buyer).setSigner(UNTRUSTED_SIGNER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
+  })
+
+  it("Signer cannot set signer", async function() {
+    expect(await gateway.owner()).equals(owner.address);
+    await expect(gateway.connect(signer).setSigner(UNTRUSTED_SIGNER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
   })
   
   it("Transfer exact amount from buyer to merchant", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     expect(await token.balanceOf(merchant.address)).equals(0);
     expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT);
 
@@ -158,7 +152,7 @@ describe("PaymentRail", function () {
   })
 
   it("Contract holds no tokens after payment (non-custodial)", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
 
     expect(await token.balanceOf(await gateway.getAddress())).equals(0)
     await approveAndPay(token, buyer, gateway, domain, value, signature)
@@ -166,21 +160,21 @@ describe("PaymentRail", function () {
   })
   
   it("Same buyer can pay two different invoices", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT / 2, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT / 2, signer, token, merchant, gateway)
 
     expect(await token.balanceOf(await merchant.getAddress())).equals(0)
     
     await approveAndPay(token, buyer, gateway, domain, value, signature)
     expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT / 2)
     
-    const {signature: newSignature, value: newValue, domain: newDomain} = await serverCreateInvoice(INVOICE_ID + 1, TRANSFER_AMOUNT / 2, owner, token, merchant, gateway)
+    const {signature: newSignature, value: newValue, domain: newDomain} = await serverCreateInvoice(INVOICE_ID + 1, TRANSFER_AMOUNT / 2, signer, token, merchant, gateway)
   
     await approveAndPay(token, buyer, gateway, newDomain, newValue, newSignature)
     expect(await token.balanceOf(await merchant.getAddress())).equals(TRANSFER_AMOUNT)
   })
 
   it("Succesful transfer emits PaymentReceived event with correct args", async function () {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     await token.connect(buyer).approve(await gateway.getAddress(), value.amount)
     await expect(await gateway
       .connect(buyer)
@@ -192,14 +186,14 @@ describe("PaymentRail", function () {
   })
 
   it("An expired signature cannot be used", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     
     await networkHelpers.time.increase(value.deadline + 1) //expires signature
     await expect(approveAndPay(token, buyer, gateway, domain, value, signature)).to.revertedWith("Signature expired")
   })
 
   it("User cannot pay twice on the same invoice", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT/2, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT/2, signer, token, merchant, gateway)
 
     expect(await token.balanceOf(await merchant.getAddress())).equals(0)
     await approveAndPay(token, buyer, gateway, domain, value, signature)
@@ -208,7 +202,7 @@ describe("PaymentRail", function () {
   })
 
   it("Payment at exactly the deadline succeeds", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     
     expect(await token.balanceOf(merchant.address)).equals(0);
     expect(await token.balanceOf(buyer.address)).equals(value.amount);
@@ -227,7 +221,7 @@ describe("PaymentRail", function () {
   })
 
   it("Insufficient allowance reverts", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     
     await token.connect(buyer).approve(await gateway.getAddress(), value.amount - 1)
     await expect(gateway.connect(buyer).pay(
@@ -237,7 +231,7 @@ describe("PaymentRail", function () {
   })
 
   it("Insufficient balance reverts", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT + 1, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT + 1, signer, token, merchant, gateway)
     expect(await token.balanceOf(buyer.address)).equals(TRANSFER_AMOUNT)
     await token.connect(buyer).approve(await gateway.getAddress(), TRANSFER_AMOUNT + 1)
     await expect(gateway.connect(buyer).pay(
@@ -247,37 +241,37 @@ describe("PaymentRail", function () {
     })
 
   it("Cannot set signer to zero address", async function() {
-    await expect(gateway.setServerAddr(ethers.ZeroAddress)).to.revertedWith("Cannot set zero address")
+    await expect(gateway.setSigner(ethers.ZeroAddress)).to.revertedWith("Cannot set zero address")
   })
 
   it("Tamper with invoiceId invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const tamperedValue = {...value, id: encodeBytes32String(TAMPERED_INVOICE_ID)}
 
     await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, signature)).to.be.revertedWith("Invalid signature")
   })
   
   it("Tamper with tokenAddr invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const tamperedValue = {...value, tokenAddr: TAMPERED_TOKEN_ADDR}
 
     await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, signature)).to.be.revertedWith("Invalid signature")
   })
   it("Tamper with amount invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const tamperedValue = {...value, amount: TAMPERED_AMOUNT}
 
     await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, signature)).to.be.revertedWith("Invalid signature")
   })
   it("Tamper with merchantAddr invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const tamperedValue = {...value, merchantAddr: TAMPERD_MERCHANT_ADDR}
 
     await expect(approveAndPay(token, buyer, gateway, domain, tamperedValue, signature)).to.be.revertedWith("Invalid signature")
   })
 
   it("Tamper with deadline (increase) invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway) 
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway) 
     //original deadline = t + 300
     //tampered deadline = t + 300 + 699 = t + 999
     const tamperedValue = {...value, deadline: value.deadline + 699} 
@@ -286,7 +280,7 @@ describe("PaymentRail", function () {
   })
 
   it("Tamper with deadline (decrease) invalidates signature", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     //original deadline = t + 300
     //tampered deadline = t + 300 - 301 = t - 1
     const tamperedValue = {...value, deadline: value.deadline - 301}
@@ -296,26 +290,26 @@ describe("PaymentRail", function () {
   })
 
   it("Cannot validate a signature on a different blockchain network", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const tamperedDomain= {...domain, chainId: FAKE_NETWORK}
     await expect(approveAndPay(token, buyer, gateway, tamperedDomain, value, signature)).to.be.revertedWith("Invalid signature")
   })
 
   it("Malformed signature reverts", async function() {
-    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {signature, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const malformedSig = `${signature}00`
     await expect(approveAndPay(token, buyer, gateway, domain, value, malformedSig)).to.be.revertedWith("Invalid signature length")
   })
 
   it("Valid signature from another invoice cannot be used to pay for another invoice", async function() {
-    const invoice1 = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const invoice1 = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const invoice2 = await serverCreateInvoice(INVOICE_ID + 1, TRANSFER_AMOUNT, owner, token, merchant, gateway)
 
     await expect(approveAndPay(token, buyer, gateway, invoice1.domain, invoice1.value, invoice2.signature)).to.be.revertedWith("Invalid signature")
   })
 
   it("A valid signature signed by someone else cannot be used to pay", async function() {
-    const {types, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, owner, token, merchant, gateway)
+    const {types, value, domain} = await serverCreateInvoice(INVOICE_ID, TRANSFER_AMOUNT, signer, token, merchant, gateway)
     const signatureSignedBySomeoneElse = await buyer.signTypedData(domain, types, value)
     await expect(approveAndPay(token, buyer, gateway, domain, value, signatureSignedBySomeoneElse)).to.be.revertedWith("Invalid signature")
   })

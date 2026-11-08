@@ -12,7 +12,7 @@ interface IERC20 {
 
 contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
-    address public serverAddr;
+    address public signer;
     mapping(bytes32 => bool) hasPaid;
 
     bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256(
@@ -23,8 +23,9 @@ contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         "Invoice(bytes32 id,address tokenAddr,uint256 amount,address merchantAddr,uint256 deadline)"
     );
 
-    function initialize() initializer public {
+    function initialize(address _signer) initializer public {
         __Ownable_init(msg.sender);
+        signer = _signer;
     }
 
 
@@ -39,9 +40,9 @@ contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit PaymentReceived(invoice.id);
     }
 
-    function setServerAddr(address newServerAddr) external onlyOwner {
-        require(newServerAddr != address(0), "Cannot set zero address");
-        serverAddr = newServerAddr;
+    function setSigner(address _signer) external onlyOwner {
+        require(_signer != address(0), "Cannot set zero address");
+        signer = _signer;
     }
 
     function verify(Invoice memory invoice, EIP712Domain memory domain, bytes memory signature) internal view {
@@ -60,8 +61,8 @@ contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             s := mload(add(signature, 64))
             v := byte(0, mload(add(signature, 96)))
         }
-        address signer = ecrecover(computedDigest, v,r,s);
-        require(signer != address(0) && signer == serverAddr , "Invalid signature");
+        address recoveredSigner = ecrecover(computedDigest, v,r,s);
+        require(recoveredSigner != address(0) && recoveredSigner == signer , "Invalid signature");
     }
 
     function hashStructInvoice(Invoice memory invoice) internal pure returns(bytes32) {
