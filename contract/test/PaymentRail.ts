@@ -135,21 +135,15 @@ describe("PaymentRail", function () {
   })
 
   it("Owner of PaymentRail is deployer", async function() {
-    const [owner, nonOwner] = await ethers.getSigners();
-    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
-    const gateway = await gatewayFactory.connect(owner).deploy();
-    
     expect(await gateway.owner()).equals(owner.address);
-    expect(await gateway.owner()).is.not.equals(nonOwner.address)
+    expect(await gateway.owner()).is.not.equals(buyer.address)
+    expect(await gateway.owner()).is.not.equals(merchant.address)
   })
 
   it("Only owner can set the trusted server address", async function() {
-    const [owner, nonOwner] = await ethers.getSigners();
-    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
-    const gateway = await gatewayFactory.connect(owner).deploy();
     expect(await gateway.owner()).equals(owner.address);
     expect(await gateway.connect(owner).setServerAddr(TRUSTED_SERVER_ADDR))
-    await expect(gateway.connect(nonOwner).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
+    await expect(gateway.connect(buyer).setServerAddr(UNTRUSTED_SERVER_ADDR)).to.be.revertedWithCustomError(gateway, "OwnableUnauthorizedAccount")
   })
   
   it("Transfer exact amount from buyer to merchant", async function() {
