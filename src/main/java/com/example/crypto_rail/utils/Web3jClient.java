@@ -107,7 +107,9 @@ public class Web3jClient {
 
         //Find every invoice that can be marked finalized
         List<InvoicePaymentDto> payments = invoicePaymentService.canFinalize(newBlockNumber);
-        invoiceService.toFinality(payments.stream().map(InvoicePaymentDto::invoiceHashId).toList());
+        if (!payments.isEmpty()) {
+            invoiceService.toFinality(payments.stream().map(InvoicePaymentDto::invoiceHashId).toList());
+        }
 
         //Mark this block as processed
         processedBlock.addLast(new BlockDto(newBlock.getNumber(), newBlock.getHash()));
