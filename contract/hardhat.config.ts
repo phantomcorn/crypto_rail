@@ -1,8 +1,8 @@
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import { configVariable, defineConfig } from "hardhat/config";
-
+import hardhatUpgrades from '@openzeppelin/hardhat-upgrades';
 export default defineConfig({
-  plugins: [hardhatToolboxMochaEthersPlugin],
+  plugins: [hardhatToolboxMochaEthersPlugin, hardhatUpgrades],
   solidity: {
     profiles: {
       default: {
@@ -15,6 +15,13 @@ export default defineConfig({
             enabled: true,
             runs: 200,
           },
+        },
+      },
+    },
+    settings: {
+      outputSelection: {
+        '*': {
+          '*': ['storageLayout'],
         },
       },
     },
