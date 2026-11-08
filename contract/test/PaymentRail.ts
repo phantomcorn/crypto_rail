@@ -117,9 +117,21 @@ describe("PaymentRail", function () {
   });
 
   it("can deploy proxy on PaymentRail", async function() {
-    const gateway = await ethers.getContractFactory("PaymentRail");
-    await gateway.deploy()
-    await upgradesApi.deployProxy(gateway, [], {kind: 'uups'})
+    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
+    const gateway = await upgradesApi.deployProxy(gatewayFactory, [], {kind: 'uups'})
+  })
+
+  it("Upgrading contract retains the same address", async function() {
+    const gatewayFactory = await ethers.getContractFactory("PaymentRail");
+    const v1Impl = await gatewayFactory.deploy()
+    const v1 = await upgradesApi.deployProxy(gatewayFactory, [], {kind: 'uups'})
+
+    const gatewayFactoryV2 = await ethers.getContractFactory("PaymentRailV2");
+    const v2Impl = await gatewayFactoryV2.deploy()
+    const v2 = await upgradesApi.upgradeProxy(v1 , gatewayFactoryV2)
+
+    expect(await v1Impl.getAddress()).not.equals(await v2Impl.getAddress())
+    expect(await v1.getAddress()).equals(await v2.getAddress())
   })
 
   it("Owner of PaymentRail is deployer", async function() {
