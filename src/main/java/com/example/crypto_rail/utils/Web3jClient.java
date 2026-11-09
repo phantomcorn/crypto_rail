@@ -44,8 +44,8 @@ public class Web3jClient {
     private static final BigInteger FIVE_MINUTES = BigInteger.valueOf(500);
     public static final Long CHAIN_ID = 11155111L;
     public static final String APP_NAME = "CryptoRail";
-    public static final String CRYPTO_RAIL_ADDRESS = "0xd0F29Ad5DC15a44df7461D16C125cfd809150F19";
-    public static final String APP_VERSION = "0.0.1";
+    public static final String CRYPTO_RAIL_ADDRESS = "0xD57d025c0A295b29B9dd2209e3BdD67580e92CB7";
+    public static final String APP_VERSION = "2.0.0";
     public static final String topic0 = Hash.sha3String("PaymentReceived(bytes32)");
 
     private final Deque<BlockDto> processedBlock = new ArrayDeque<>();
