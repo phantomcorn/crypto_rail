@@ -3,6 +3,8 @@ Crypto payment gateway using Spring Boot API and Web3j watcher
 
 ## TODO
 ### Features
+- [x] CryptoRail smart contract
+- [x] Implement EIP-719 for security
 - [x] Merchant generates invoice by calling our backend server using REST API
 - [x] Server returns checkout page
 - [x] Connect wallet to checkout page
