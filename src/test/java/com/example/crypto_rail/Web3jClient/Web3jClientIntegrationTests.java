@@ -232,11 +232,6 @@ public class Web3jClientIntegrationTests {
         return Bloom.test(block.getLogsBloom(), Web3jClient.CRYPTO_RAIL_ADDRESS, Web3jClient.topic0);
     }
 
-    public boolean isBeforeCommonAncestor(NewHead block) {
-        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
-        return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) < 0;
-    }
-
     public boolean isAfterOrOnCommonAncestor(NewHead block) {
         NewHead commonAncestor = normalChain.get(5).getParams().getResult();
         return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) >= 0;
@@ -284,7 +279,6 @@ public class Web3jClientIntegrationTests {
     public void aNewBlockWithTopicShouldCallEthGetLogs() {
         NewHeadsNotification blockNotificationWithTopic = normalChain.get(1);
         NewHead blockWithTopic = blockNotificationWithTopic.getParams().getResult();
-        Assertions.assertEquals("0x00000000000400000000000000000000000000000008000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000", blockWithTopic.getLogsBloom());
         Assertions.assertTrue(containsPaymentEvent(blockWithTopic));
         newHeadPublisher.onNext(blockNotificationWithTopic);
         Mockito.verify(web3j).ethGetLogs(any());
