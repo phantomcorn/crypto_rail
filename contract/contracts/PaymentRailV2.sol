@@ -17,4 +17,6 @@ contract PaymentRailV2 is PaymentRail {
         emit PaymentReceived(invoice.id);
     }
 
+    function version() pure override external returns(string memory) { return "2.0.0"; }
+
 } 

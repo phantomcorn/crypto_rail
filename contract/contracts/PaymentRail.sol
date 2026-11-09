@@ -91,4 +91,6 @@ contract PaymentRail is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-}
+
+    function version() pure virtual external returns(string memory) { return "1.0.0"; }
+}   

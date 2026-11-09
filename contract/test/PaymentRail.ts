@@ -108,6 +108,7 @@ describe("PaymentRail", function () {
   it("Can deploy proxy on PaymentRail", async function() {
     const gatewayFactory = await ethers.getContractFactory("PaymentRail");
     const gateway = await upgradesApi.deployProxy(gatewayFactory, [signer.address], {kind: 'uups'})
+    expect(await gateway.version()).equals("1.0.0")
   })
 
   it("Upgrading contract retains the same address", async function() {
@@ -119,6 +120,7 @@ describe("PaymentRail", function () {
     const v2Impl = await gatewayFactoryV2.deploy()
     const v2 = await upgradesApi.upgradeProxy(v1 , gatewayFactoryV2)
 
+    expect(await gateway.version()).equals("2.0.0")
     expect(await v1Impl.getAddress()).not.equals(await v2Impl.getAddress())
     expect(await v1.getAddress()).equals(await v2.getAddress())
   })
