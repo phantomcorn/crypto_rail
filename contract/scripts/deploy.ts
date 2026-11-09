@@ -14,4 +14,5 @@ await v1.waitForDeployment()
 
 const proxy = await v1.getAddress()
 const impl = await upgradesApi.erc1967.getImplementationAddress(proxy);
+console.log("Version " + await v1.version())
 console.log({ proxy, impl, chainId: (await ethers.provider.getNetwork()).chainId})
