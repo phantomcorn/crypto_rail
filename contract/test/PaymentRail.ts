@@ -1,6 +1,6 @@
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { expect } from "chai";
-import { Contract, Wallet,  encodeBytes32String } from "ethers";
+import { Wallet,  encodeBytes32String } from "ethers";
 import type { PaymentRail } from "../types/ethers-contracts/PaymentRail.js";
 import type { MockERC20 } from "../types/ethers-contracts/MockERC20.js";
 import { upgrades } from '@openzeppelin/hardhat-upgrades';
