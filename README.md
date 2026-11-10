@@ -19,6 +19,9 @@ Crypto payment gateway using Spring Boot API and Web3j watcher
 - [ ] Detect Transfer event from token contract on the blockchain and update invoice status
 ### Edge cases
 - [ ] Buyer clicks pay 1 second before expiry, contract `block.timestamp` shows expired. Transaction reverts + gas fee paid
+- [ ] Watcher crashes halfway through processing a block
+  - [ ] Checkpoint every processed block
+  - [ ] Resume from checkpoint
 
 ## Features
 - `PaymentRail.sol` contract acts as a non-custodial intermediary between buyer and seller leveraging DLT.
