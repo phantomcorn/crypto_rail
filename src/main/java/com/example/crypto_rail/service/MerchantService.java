@@ -2,6 +2,7 @@ package com.example.crypto_rail.service;
 
 import com.example.crypto_rail.dto.MerchantCreateDto;
 import com.example.crypto_rail.dto.MerchantDto;
+import com.example.crypto_rail.dto.MerchantLoginDto;
 import com.example.crypto_rail.entity.Merchant;
 import com.example.crypto_rail.repository.MerchantRepository;
 import io.jsonwebtoken.Jwts;
@@ -38,5 +39,9 @@ public class MerchantService {
         );
 
         return merchantRepository.save(merchant).toDto();
+    }
+
+    public String authenticate(MerchantLoginDto dto) {
+        return "";
     }
 }

@@ -2,7 +2,9 @@ package com.example.crypto_rail.controller;
 
 import com.example.crypto_rail.dto.MerchantCreateDto;
 import com.example.crypto_rail.dto.MerchantDto;
+import com.example.crypto_rail.dto.MerchantLoginDto;
 import com.example.crypto_rail.dto.request.MerchantCreateRequest;
+import com.example.crypto_rail.dto.request.MerchantLoginRequest;
 import com.example.crypto_rail.service.MerchantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +34,19 @@ public class MerchantController {
         }
 
         return ResponseEntity.ok("Success");
+
+    }
+
+    @PostMapping("/api/merchant/login")
+    public ResponseEntity<String> login(@RequestBody MerchantLoginRequest request) {
+
+        MerchantLoginDto dto = new MerchantLoginDto(request.getUsername(), request.getPassword());
+        String token = merchantService.authenticate(dto);
+        if (token == null) {
+            return ResponseEntity.status(401).body("Incorrect credentials");
+        }
+
+        return ResponseEntity.ok(token);
 
     }
 }
