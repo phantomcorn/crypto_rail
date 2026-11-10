@@ -7,6 +7,8 @@ import lombok.Data;
 @AllArgsConstructor
 public class MerchantCreateRequest {
 
+    String username;
+    String password;
     String name;
     String merchantAddress;
     String uri;

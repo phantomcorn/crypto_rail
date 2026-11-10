@@ -7,6 +7,8 @@ import lombok.Data;
 @Builder
 public class MerchantCreateDto {
 
+    String username;
+    String password;
     String name;
     String merchantAddress;
     String uri;

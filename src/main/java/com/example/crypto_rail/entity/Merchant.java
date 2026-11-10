@@ -16,6 +16,12 @@ import lombok.*;
 public class Merchant {
 
     @Id
+    @Column(name = "username")
+    private String username;
+
+    @Column(name = "password")
+    private String password;
+
     @Column(name = "address", length=42) //Address is 20 bytes. In hex that is 40 character + "0x" = 42
     private String address;
 

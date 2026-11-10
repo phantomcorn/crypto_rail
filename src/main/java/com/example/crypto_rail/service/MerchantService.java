@@ -29,6 +29,8 @@ public class MerchantService {
         String key = Encoders.BASE64.encode(Jwts.SIG.HS256.key().build().getEncoded());
 
         Merchant merchant = new Merchant(
+                merchantCreateDto.getUsername(),
+                merchantCreateDto.getPassword(),
                 merchantCreateDto.getMerchantAddress(),
                 merchantCreateDto.getName(),
                 merchantCreateDto.getUri(),
