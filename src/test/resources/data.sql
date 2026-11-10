@@ -69,3 +69,13 @@ INSERT INTO invoices (
     1761300000,                                       -- unix deadline
     'CONFIRMED'
 );
+
+INSERT INTO merchant (
+    address,
+    name,
+    uri
+) VALUES (
+    '0x1111111111111111111111111111111111111111',
+    'Merchant A',
+    'https://www.google.com'
+);
