@@ -24,6 +24,9 @@ public class MerchantService implements UserDetailsService {
     @Autowired
     PasswordEncoder encoder;
 
+    @Autowired
+    JwtService jwtService;
+
     public Optional<MerchantDto> findMerchantByUsername(String username) {
         return merchantRepository.findById(username).map(Merchant::toDto);
     }
@@ -31,7 +34,7 @@ public class MerchantService implements UserDetailsService {
     public MerchantDto create(MerchantCreateDto merchantCreateDto) {
 
         if (merchantRepository.existsById(merchantCreateDto.getMerchantAddress())) {
-            return new MerchantDto(null, null, null, null, null);
+            return new MerchantDto(null, null, null, null, null, null);
         }
 
         String key = Encoders.BASE64.encode(Jwts.SIG.HS256.key().build().getEncoded());
@@ -49,7 +52,18 @@ public class MerchantService implements UserDetailsService {
     }
 
     public String authenticate(MerchantLoginDto dto) {
-        return "";
+
+        boolean exist = merchantRepository.existsById(dto.username());
+        if (!exist) {
+            return null;
+        }
+
+        MerchantDto merchant = merchantRepository.findById(dto.username()).get().toDto();
+        if (!encoder.matches(dto.password(), merchant.password())) {
+            return null;
+        }
+
+        return jwtService.createToken(dto.username(), JwtService.ACCESS_TOKEN_TTL);
     }
 
     @Override
