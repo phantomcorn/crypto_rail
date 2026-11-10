@@ -27,7 +27,7 @@ public class InvoiceController {
     @Autowired
     InvoiceService invoiceService;
 
-    @PostMapping("/api/pay")
+    @PostMapping("/api/checkout")
     public ResponseEntity<PayResponse> pay(@RequestBody PayRequest request) throws IOException {
 
         PayRequestDto dto = PayRequestDto.builder()
@@ -41,12 +41,7 @@ public class InvoiceController {
         return ResponseEntity.ok(resp);
     }
 
-    @GetMapping("/api/hello")
-    public ResponseEntity<String> hello() {
-        return ResponseEntity.ok("hello");
-    }
-
-    @GetMapping("/checkout/{invoiceId}")
+    @GetMapping("/api/checkout/{invoiceId}")
     public String renderCheckoutPage(Model model, @PathVariable String invoiceId) {
 
         Optional<InvoiceDto> invoiceObj = invoiceService.getInvoiceDetails(invoiceId);
