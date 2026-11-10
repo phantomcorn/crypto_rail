@@ -8,11 +8,14 @@ import com.example.crypto_rail.repository.MerchantRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Encoders;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
-public class MerchantService {
+public class MerchantService implements UserDetailsService {
 
     @Autowired
     MerchantRepository merchantRepository;
@@ -43,5 +46,10 @@ public class MerchantService {
 
     public String authenticate(MerchantLoginDto dto) {
         return "";
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        return merchantRepository.findByUsername(username);
     }
 }
