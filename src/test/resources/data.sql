@@ -71,11 +71,17 @@ INSERT INTO invoices (
 );
 
 INSERT INTO merchant (
+    username,
+    password,
     address,
     name,
-    uri
+    uri,
+    secret_key
 ) VALUES (
+    'user1',
+    'password',
     '0x1111111111111111111111111111111111111111',
     'Merchant A',
-    'https://www.google.com'
+    'https://www.google.com',
+    'key1'
 );

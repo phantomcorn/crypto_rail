@@ -36,6 +36,7 @@ public class WebhooksIntegrationTest {
 
     EventDispatcher dispatcher;
     String merchantAddress = "0x1111111111111111111111111111111111111111";
+    String merchantUsername = "user1";
 
     @BeforeEach
     public void buildDispatcher() {
@@ -53,25 +54,27 @@ public class WebhooksIntegrationTest {
     public void dispatcherCanSeeMessageInbox() {
         EventMessage message = EventMessage
                 .builder()
+                .username("user1")
                 .merchantAddress("0x1111111111111111111111111111111111111111")
                 .invoiceId(Hash.sha3String(UUID.randomUUID().toString()))
                 .status(Status.DETECTED)
                 .build();
 
         inbox.getPublisher().onNext(message);
-        Mockito.verify(merchantService).findMerchantByAddress(message.getMerchantAddress());
+        Mockito.verify(merchantService).findMerchantByUsername(message.getUsername());
     }
 
     @Test
     public void dispatcherHandlerSendsRequest() {
         EventMessage message = EventMessage
                 .builder()
+                .username(merchantUsername)
                 .merchantAddress(merchantAddress)
                 .invoiceId(Hash.sha3String(UUID.randomUUID().toString()))
                 .status(Status.DETECTED)
                 .build();
 
-        MerchantDto merchantDto = merchantService.findMerchantByAddress(merchantAddress).get();
+        MerchantDto merchantDto = merchantService.findMerchantByUsername(merchantUsername).get();
 
         inbox.getPublisher().onNext(message);
         Mockito.verify(sender).send(

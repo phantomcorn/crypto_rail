@@ -8,6 +8,7 @@ import lombok.Getter;
 @Getter
 public class EventMessage {
 
+    String username;
     String merchantAddress;
     String invoiceId;
     Status status;

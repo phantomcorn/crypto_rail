@@ -43,7 +43,7 @@ public class EndToEndTests {
         );
 
         mockMvc.perform(
-                    post("/api/pay")
+                    post("/api/checkout")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json.writeValueAsString(request))
                 ).andExpect(
@@ -55,6 +55,8 @@ public class EndToEndTests {
     public void createMerchantReturnsSuccess() throws Exception {
 
         MerchantCreateRequest request = new MerchantCreateRequest(
+                "user1",
+                "11111",
                 "Google",
                 "0x207F6986e453D5AEcaDa283E252fb78946E38A37",
                 "www.google.com"
@@ -70,19 +72,21 @@ public class EndToEndTests {
     }
 
     @Test
-    public void duplicateMerchantReturns304() throws Exception {
+    public void duplicateMerchantReturns200() throws Exception {
 
-        String address = "0x1111111111111111111111111111111111111111";
+        String user = "user1";
 
         Assertions.assertEquals(1, merchantRepository.findAll().size());
-        Assertions.assertTrue(merchantRepository.existsById(address));
+        Assertions.assertTrue(merchantRepository.existsById(user));
 
         MerchantCreateRequest request = new MerchantCreateRequest(
+                "user1",
+                "11111",
                 "Google",
-                address,
+                "0x1111111111111111111111111111111111111111",
                 "www.google.com"
         );
-        System.out.println(json.writeValueAsString(request));
+
         mockMvc.perform(
                 post("/api/merchant/register")
                         .contentType(MediaType.APPLICATION_JSON)

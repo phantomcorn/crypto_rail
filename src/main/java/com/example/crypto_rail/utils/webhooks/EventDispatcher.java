@@ -27,7 +27,7 @@ public class EventDispatcher { //subscriber to EventInbox
 
     public void handler(EventMessage message) {
         //find merchant uri
-        Optional<MerchantDto> found = merchantService.findMerchantByAddress(message.merchantAddress);
+        Optional<MerchantDto> found = merchantService.findMerchantByUsername(message.username);
         if (found.isEmpty()) {
             //TODO: raise error (this handler should only be called when event updates i.e must have merchant entity)
         }

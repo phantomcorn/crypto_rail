@@ -40,7 +40,7 @@ public class Merchant implements UserDetails {
     private String secretKey; //signing webhooks
 
     public MerchantDto toDto() {
-        return new MerchantDto(address, name, uri, secretKey);
+        return new MerchantDto(username, address, name, uri, secretKey);
     }
 
     @Override

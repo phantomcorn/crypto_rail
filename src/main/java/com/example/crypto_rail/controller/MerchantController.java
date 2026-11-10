@@ -23,6 +23,8 @@ public class MerchantController {
 
         MerchantCreateDto merchantCreateDto = MerchantCreateDto
                 .builder()
+                .username(merchantCreateRequest.getUsername())
+                .password(merchantCreateRequest.getPassword())
                 .name(merchantCreateRequest.getName())
                 .merchantAddress(merchantCreateRequest.getMerchantAddress())
                 .uri(merchantCreateRequest.getUri())
