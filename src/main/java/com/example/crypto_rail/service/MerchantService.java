@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
 
@@ -19,6 +20,9 @@ public class MerchantService implements UserDetailsService {
 
     @Autowired
     MerchantRepository merchantRepository;
+
+    @Autowired
+    PasswordEncoder encoder;
 
     public Optional<MerchantDto> findMerchantByUsername(String username) {
         return merchantRepository.findById(username).map(Merchant::toDto);
@@ -34,7 +38,7 @@ public class MerchantService implements UserDetailsService {
 
         Merchant merchant = new Merchant(
                 merchantCreateDto.getUsername(),
-                merchantCreateDto.getPassword(),
+                encoder.encode(merchantCreateDto.getPassword()),
                 merchantCreateDto.getMerchantAddress(),
                 merchantCreateDto.getName(),
                 merchantCreateDto.getUri(),
