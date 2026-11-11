@@ -19,8 +19,6 @@ spring:
       org:
         springframework:
           security=DEBUG:
-  profile:
-    active: dev
 rpc:
   endpoint-url: ${RPC_ENDPOINT_URL}
 sepolia:
