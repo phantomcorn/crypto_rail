@@ -355,4 +355,56 @@ public class AuthIntegrationTests {
 
     }
 
+    @Test
+    public void canGenerateApiKeyWithAuth() throws Exception {
+        String accessToken = login();
+        Cookie cookie = new Cookie("access_token", accessToken);
+        cookie.setHttpOnly(true);
+
+        ApiKeyCreateRequest request = new ApiKeyCreateRequest("key1");
+
+        mockMvc.perform(
+                post("/api/key/create")
+                        .cookie(cookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(request))
+        ).andExpect(
+                status().isOk()
+        ).andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    public void canUseApiKeyToAuthenticateInvoiceEndpoints() throws Exception {
+        String accessToken = login();
+        Cookie cookie = new Cookie("access_token", accessToken);
+        cookie.setHttpOnly(true);
+
+        ApiKeyCreateRequest request = new ApiKeyCreateRequest("key1");
+
+        String apiKey = mockMvc.perform(
+                post("/api/key/create")
+                        .cookie(cookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(request))
+        ).andExpect(
+                status().isOk()
+        ).andReturn().getResponse().getContentAsString();
+
+        PayRequest checkoutRequest = new PayRequest(
+                BigInteger.valueOf(1000000),
+                "0x207F6986e453D5AEcaDa283E252fb78946E38A37",
+                "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"
+        );
+
+        mockMvc.perform(
+                post("/api/checkout")
+                        .header("Authorization", String.format("Bearer %s:%s", username, apiKey))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(checkoutRequest))
+        ).andExpect(
+                status().isOk()
+        );
+
+    }
+
 }
