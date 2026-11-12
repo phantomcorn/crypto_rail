@@ -407,4 +407,36 @@ public class AuthIntegrationTests {
 
     }
 
+    @Test
+    public void cannotUseApiKeyToCreateMoreKey() throws Exception {
+        String accessToken = login();
+        Cookie cookie = new Cookie("access_token", accessToken);
+        cookie.setHttpOnly(true);
+
+        ApiKeyCreateRequest request = new ApiKeyCreateRequest("key1");
+
+        String apiKey = mockMvc.perform(
+                post("/api/key/create")
+                        .cookie(cookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(request))
+        ).andExpect(
+                status().isOk()
+        ).andReturn().getResponse().getContentAsString();
+
+        ApiKeyCreateRequest request2 = new ApiKeyCreateRequest("key2");
+
+        mockMvc.perform(
+                post("/api/key/create")
+                        .header("X-API-Key", String.format("%s:%s", username, apiKey))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(request2))
+        ).andExpect(
+                status().isForbidden()
+        );
+
+    }
+
+
+
 }

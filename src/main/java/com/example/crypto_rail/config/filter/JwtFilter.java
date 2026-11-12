@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter{
@@ -27,6 +30,8 @@ public class JwtFilter extends OncePerRequestFilter{
 
     @Autowired
     private ApplicationContext context;
+
+    public static final GrantedAuthority GRANTED_ROLE = new SimpleGrantedAuthority("TOKEN_USER");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -51,6 +56,7 @@ public class JwtFilter extends OncePerRequestFilter{
         */
             if (jwtService.validateToken(accessToken, userDetails)) {
                 //Create new auth token
+                System.out.println("Jwt Filter: Success");
                 setCredentials(request, userDetails);
                 filterChain.doFilter(request, response);
                 return;
@@ -77,6 +83,7 @@ public class JwtFilter extends OncePerRequestFilter{
             response.addCookie(accessTokenCookie);
 
             //Create new auth token (The next time this filter is called, it will use the new access token)
+            System.out.println("Jwt Filter: Success");
             setCredentials(request, userDetails);
 
         }
@@ -89,7 +96,7 @@ public class JwtFilter extends OncePerRequestFilter{
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                 userDetails,
                 null,
-                userDetails.getAuthorities()
+                List.of(GRANTED_ROLE)
         );
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authToken);

@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -15,13 +17,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+
 @Component
 public class ApiKeyFilter extends OncePerRequestFilter {
 
     @Autowired
     ApiKeyService apiKeyService;
 
-    private final String role = "API_USER";
+    public static final GrantedAuthority GRANTED_ROLE = new SimpleGrantedAuthority("API_KEY_USER");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -45,6 +49,7 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         ApiKeyDto keyDto = apiKeyService.verify(username, key);
 
         if (keyDto != null) {
+            System.out.println("API Key Filter: Success");
             setCredentials(request, keyDto.merchant());
         }
 
@@ -57,7 +62,7 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                 userDetails,
                 null,
-                userDetails.getAuthorities()
+                List.of(GRANTED_ROLE)
         );
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authToken);
