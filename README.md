@@ -13,7 +13,8 @@ Crypto payment gateway using Spring Boot API and Web3j watcher
 - [x] Any invoice status update sends message to inbox
 - [x] Endpoint to register merchant
 - [x] KMS for signed webhooks
-- [x] Inbox fetches message, creates, signs and sends webhook to merchant endpoint
+- [x] Inbox fetches message, creates, signs and sends webhook to merchant endpoint up- [x] Authenticated user to can access api and invoice endpoint
+- [x] api key access cannot generate more api key
 - [ ] Display merchant address as QR code
 - [ ] Monitor token Transfer event incase buyer transfer directly to merchant address using QR code
 - [ ] Detect Transfer event from token contract on the blockchain and update invoice status
