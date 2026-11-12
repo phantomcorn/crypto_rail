@@ -6,12 +6,14 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.util.Base64;
 import java.util.Date;
 import java.util.function.Function;
@@ -24,6 +26,9 @@ public class JwtService {
     // 6 hours
     public static final long REFRESH_TOKEN_TTL = 1000L * 60L * 60L * 6L;
     private final String secretKey;
+
+    @Autowired
+    Clock clock;
 
     public JwtService() {
         try {
@@ -47,7 +52,7 @@ public class JwtService {
     public boolean isTokenExpired(String token) {
         try {
             Date expiredAt = extractClaim(token, Claims::getExpiration);
-            return expiredAt.before(new Date());
+            return expiredAt.before(new Date(clock.millis()));
         } catch (ExpiredJwtException | SignatureException e) {
             return true;
         }
@@ -56,14 +61,15 @@ public class JwtService {
     public String createToken(String username, long duration) {
         return Jwts.builder()
                 .subject(username)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + duration))
+                .issuedAt(new Date(clock.millis()))
+                .expiration(new Date(clock.millis() + duration))
                 .signWith(getKey())
                 .compact();
     }
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
+                .clock(() -> Date.from(clock.instant()))
                 .verifyWith(getKey())
                 .build()
                 .parseSignedClaims(token)
