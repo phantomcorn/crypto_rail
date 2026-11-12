@@ -398,7 +398,7 @@ public class AuthIntegrationTests {
 
         mockMvc.perform(
                 post("/api/checkout")
-                        .header("Authorization", String.format("Bearer %s:%s", username, apiKey))
+                        .header("X-API-Key", String.format("%s:%s", username, apiKey))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(checkoutRequest))
         ).andExpect(

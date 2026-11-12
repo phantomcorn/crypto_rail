@@ -21,23 +21,18 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     @Autowired
     ApiKeyService apiKeyService;
 
+    private final String role = "API_USER";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        String value = request.getHeader("Authorization");
-        if (value == null || !value.startsWith("Bearer ")) {
+        String value = request.getHeader("X-API-Key");
+        if (value == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String[] token = value.split(" ");
-
-        if (token.length != 2) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String[] items = token[1].split(":");
+        String[] items = value.split(":");
 
         if (items.length != 2) {
             filterChain.doFilter(request, response);
@@ -50,14 +45,7 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         ApiKeyDto keyDto = apiKeyService.verify(username, key);
 
         if (keyDto != null) {
-
-            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    keyDto.merchant(),
-                    null,
-                    keyDto.merchant().getAuthorities()
-            );
-            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+            setCredentials(request, keyDto.merchant());
         }
 
         filterChain.doFilter(request,response);
