@@ -1,4 +1,16 @@
 package com.example.crypto_rail.dto;
 
-public record MerchantLoginDto(String username, String password) {
+import lombok.Builder;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter @Setter
+@Data
+@Builder
+public class MerchantLoginDto {
+    String username;
+    String password;
+    String accessToken;
+    String refreshToken;
 }

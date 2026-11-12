@@ -7,6 +7,8 @@ import com.example.crypto_rail.dto.request.MerchantCreateRequest;
 import com.example.crypto_rail.dto.request.MerchantLoginRequest;
 import com.example.crypto_rail.service.MerchantService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,15 +42,28 @@ public class MerchantController {
     }
 
     @PostMapping("/api/merchant/login")
-    public ResponseEntity<String> login(@RequestBody MerchantLoginRequest request) {
+    public ResponseEntity login(@RequestBody MerchantLoginRequest request) {
 
-        MerchantLoginDto dto = new MerchantLoginDto(request.getUsername(), request.getPassword());
-        String token = merchantService.authenticate(dto);
-        if (token == null) {
+        MerchantLoginDto dto = MerchantLoginDto.builder()
+                .username(request.getUsername())
+                .password(request.getPassword())
+                .build();
+        MerchantLoginDto dtoWithToken = merchantService.authenticate(dto);
+        if (dtoWithToken == null) {
             return ResponseEntity.status(401).body("Incorrect credentials");
         }
 
-        return ResponseEntity.ok(token);
+        ResponseCookie accessCookie = ResponseCookie.from("access_token", dto.getAccessToken())
+                .httpOnly(true)
+                .build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshs_token", dto.getRefreshToken())
+                .httpOnly(true)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString(), refreshCookie.toString())
+                .body("Success");
 
     }
 }

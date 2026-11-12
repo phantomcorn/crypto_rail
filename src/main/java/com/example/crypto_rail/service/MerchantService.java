@@ -51,19 +51,21 @@ public class MerchantService implements UserDetailsService {
         return merchantRepository.save(merchant).toDto();
     }
 
-    public String authenticate(MerchantLoginDto dto) {
+    public MerchantLoginDto authenticate(MerchantLoginDto dto) {
 
-        boolean exist = merchantRepository.existsById(dto.username());
+        boolean exist = merchantRepository.existsById(dto.getUsername());
         if (!exist) {
             return null;
         }
 
-        MerchantDto merchant = merchantRepository.findById(dto.username()).get().toDto();
-        if (!encoder.matches(dto.password(), merchant.password())) {
+        MerchantDto merchant = merchantRepository.findById(dto.getUsername()).get().toDto();
+        if (!encoder.matches(dto.getPassword(), merchant.password())) {
             return null;
         }
 
-        return jwtService.createToken(dto.username(), JwtService.ACCESS_TOKEN_TTL);
+        dto.setAccessToken(jwtService.createToken(dto.getUsername(), JwtService.ACCESS_TOKEN_TTL));
+        dto.setRefreshToken(jwtService.createToken(dto.getUsername(), JwtService.REFRESH_TOKEN_TTL));
+        return dto;
     }
 
     @Override

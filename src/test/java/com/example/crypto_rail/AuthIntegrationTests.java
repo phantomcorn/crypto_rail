@@ -8,6 +8,7 @@ import com.example.crypto_rail.entity.Merchant;
 import com.example.crypto_rail.repository.MerchantRepository;
 import com.example.crypto_rail.service.JwtService;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +86,11 @@ public class AuthIntegrationTests {
                 status().isOk()
         ).andReturn();
 
-        return response.getResponse().getContentAsString();
+
+
+        Cookie[] cookies = response.getResponse().getCookies();
+        Assertions.assertEquals("access_token", cookies[0].getName());
+        return cookies[0].getValue();
     }
 
     @BeforeEach
@@ -109,6 +114,11 @@ public class AuthIntegrationTests {
 
     }
 
+    @AfterEach
+    public void resetTime() {
+        ReflectionTestUtils.setField(jwtService, "clock", clock);
+    }
+
     @Test
     public void registerStoreHashedPasswordNotRawPassword() {
         Assertions.assertTrue(merchantRepository.existsById(username));
@@ -120,7 +130,7 @@ public class AuthIntegrationTests {
     }
 
     @Test
-    public void loginUsingValidCredentialsReturnsAccessToken() throws Exception {
+    public void loginUsingValidCredentialsReturnsSuccessAndAccessTokenAsCookie() throws Exception {
         MerchantLoginRequest request = new MerchantLoginRequest(
                 username,
                 password
@@ -135,11 +145,12 @@ public class AuthIntegrationTests {
         ).andReturn();
 
         String result = response.getResponse().getContentAsString();
-        Assertions.assertNotNull(result);
+        Assertions.assertEquals("Success", result);
+        Assertions.assertEquals(2,response.getResponse().getCookies().length);
     }
 
     @Test
-    public void invalidLoginReturnsNull() throws Exception {
+    public void invalidLoginReturnsNoCookie() throws Exception {
         MerchantLoginRequest request = new MerchantLoginRequest(
                 username,
                 "WRONG_PASSWORD"
@@ -155,6 +166,7 @@ public class AuthIntegrationTests {
 
         String result = response.getResponse().getContentAsString();
         Assertions.assertEquals("Incorrect credentials", result);
+        Assertions.assertEquals(0, response.getResponse().getCookies().length);
     }
 
     @Test
@@ -269,7 +281,8 @@ public class AuthIntegrationTests {
         String accessToken = login();
         Cookie cookie = new Cookie("access_token", accessToken);
         cookie.setHttpOnly(true);
-        ReflectionTestUtils.setField(jwtService, "clock", Clock.offset(clock, Duration.ofSeconds(121)));
+        ReflectionTestUtils.setField(jwtService, "clock", Clock.offset(clock, Duration.ofMillis(JwtService.ACCESS_TOKEN_TTL + 1)));
+        Assertions.assertTrue(jwtService.isTokenExpired(accessToken));
 
         String refreshToken = jwtService.createToken(username, JwtService.REFRESH_TOKEN_TTL);
         Cookie refreshCookie = new Cookie("refresh_token", refreshToken);
