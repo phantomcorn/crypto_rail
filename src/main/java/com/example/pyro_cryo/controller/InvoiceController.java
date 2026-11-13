@@ -41,7 +41,7 @@ public class InvoiceController {
         return ResponseEntity.ok(resp);
     }
 
-    @GetMapping("/api/checkout/{invoiceId}")
+    @GetMapping("/checkout/{invoiceId}")
     public String renderCheckoutPage(Model model, @PathVariable String invoiceId) {
 
         Optional<InvoiceDto> invoiceObj = invoiceService.getInvoiceDetails(invoiceId);
