@@ -43,7 +43,8 @@ public class SecurityConfig {
                         auth
                                 .requestMatchers("/api/key/**").hasAuthority(JwtFilter.GRANTED_ROLE.getAuthority())
                                 .requestMatchers("/api/checkout/**").hasAnyAuthority(JwtFilter.GRANTED_ROLE.getAuthority(), ApiKeyFilter.GRANTED_ROLE.getAuthority())
-                                .requestMatchers("/api/merchant/**").permitAll()
+                                .requestMatchers("/checkout/**", "/api/watcher/health","/api/merchant/**").permitAll()
+                                .requestMatchers("/abi/**").permitAll()
                 ).sessionManagement(
                         session ->
                                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
