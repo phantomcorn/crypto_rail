@@ -96,13 +96,7 @@ public class InvoiceService {
 
         assert(changes == lockedInvoices.size());
         lockedInvoices.forEach(invoice ->
-                inbox.getPublisher().onNext(
-                        EventMessage.builder()
-                                .invoiceId(invoice.getHashId())
-                                .merchantAddress(invoice.getMerchantAddress())
-                                .status(Status.DETECTED)
-                                .build()
-                )
+                inbox.getPublisher().onNext(message(invoice, Status.DETECTED))
         );
         return true;
     }
@@ -119,13 +113,7 @@ public class InvoiceService {
 
         assert(changes == lockedIds.size());
         lockedInvoices.forEach(invoice ->
-                inbox.getPublisher().onNext(
-                        EventMessage.builder()
-                                .invoiceId(invoice.getHashId())
-                                .merchantAddress(invoice.getMerchantAddress())
-                                .status(Status.CONFIRMED)
-                                .build()
-                )
+                inbox.getPublisher().onNext(message(invoice, Status.CONFIRMED))
         );
         return true;
     }
@@ -147,14 +135,17 @@ public class InvoiceService {
 
         assert(changes == lockedInvoices.size());
         lockedInvoices.forEach(invoice ->
-                inbox.getPublisher().onNext(
-                        EventMessage.builder()
-                                .invoiceId(invoice.getHashId())
-                                .merchantAddress(invoice.getMerchantAddress())
-                                .status(Status.REORG)
-                                .build()
-                )
+                inbox.getPublisher().onNext(message(invoice, Status.REORG))
         );
         return true;
+    }
+
+    private EventMessage message(Invoice invoice, Status status) {
+        return EventMessage.builder()
+                .invoiceId(invoice.getHashId())
+                .merchantAddress(invoice.getMerchantAddress())
+                .status(status)
+                .username(invoice.getUsername())
+                .build();
     }
 }
