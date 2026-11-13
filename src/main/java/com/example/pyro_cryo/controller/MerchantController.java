@@ -57,7 +57,7 @@ public class MerchantController {
                 .httpOnly(true)
                 .build();
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshs_token", dto.getRefreshToken())
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", dto.getRefreshToken())
                 .httpOnly(true)
                 .build();
 
