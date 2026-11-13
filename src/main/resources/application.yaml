@@ -2,7 +2,7 @@ spring:
   application:
     name: crypto-rail
   datasource:
-    url: jdbc:postgresql://localhost:5432/crypto_rail
+    url: jdbc:postgresql://localhost:5432/pyro_cryo
     username: crypto
     password: crypto
   jpa:

@@ -2,11 +2,11 @@
 
 Set your private key and rpc url using 
 ```
-npx hardhat keystore set CRYPTORAIL_SEPOLIA_PRIVATE_KEY         
+npx hardhat keystore set PYROCRYO_SEPOLIA_PRIVATE_KEY         
 ```
 and 
 ```
-npx hardhat keystore set CRYPTORAIL_SEPOLIA_RPC_URL        
+npx hardhat keystore set PYROCRYO_SEPOLIA_RPC_URL        
 ```
 
 

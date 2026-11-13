@@ -38,8 +38,8 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("CRYPTORAIL_SEPOLIA_RPC_URL"),
-      accounts: [configVariable("CRYPTORAIL_SEPOLIA_PRIVATE_KEY")],
+      url: configVariable("PYROCRYO_SEPOLIA_RPC_URL"),
+      accounts: [configVariable("PYROCRYO_SEPOLIA_PRIVATE_KEY")],
     },
   },
 });

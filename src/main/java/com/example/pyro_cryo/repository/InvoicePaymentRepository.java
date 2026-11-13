@@ -1,0 +1,18 @@
+package com.example.pyro_cryo.repository;
+
+import com.example.pyro_cryo.entity.InvoicePayment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.NativeQuery;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigInteger;
+import java.util.List;
+
+@Repository
+public interface InvoicePaymentRepository extends JpaRepository<InvoicePayment, String> {
+
+    @NativeQuery("SELECT i.* FROM invoice_payments i WHERE ?1 - i.block_number >= ?2")
+    List<InvoicePayment> findFinalizedPayment(BigInteger blockNumber, BigInteger blockToFinality);
+    List<InvoicePayment> findByBlockNumberBetween(BigInteger from, BigInteger to);
+    List<InvoicePayment> findByBlockNumberGreaterThanEqual(BigInteger from);
+}

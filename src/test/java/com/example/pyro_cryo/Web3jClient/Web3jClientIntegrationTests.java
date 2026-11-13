@@ -1,0 +1,586 @@
+package com.example.pyro_cryo.Web3jClient;
+
+import com.example.pyro_cryo.Web3jClient.utils.ChainViewBeforeAfterReorg;
+import com.example.pyro_cryo.Web3jClient.utils.NotificationWithLogs;
+import com.example.pyro_cryo.dto.InvoicePaymentDto;
+import com.example.pyro_cryo.service.InvoicePaymentService;
+import com.example.pyro_cryo.service.InvoiceService;
+import com.example.pyro_cryo.utils.Web3jAdapter;
+import com.example.pyro_cryo.utils.Web3jClient;
+import io.reactivex.processors.PublishProcessor;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.annotation.Transactional;
+import org.web3j.crypto.Hash;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.Request;
+import org.web3j.protocol.core.methods.request.EthFilter;
+import org.web3j.protocol.core.methods.response.EthBlock;
+import org.web3j.protocol.core.methods.response.EthLog;
+import org.web3j.protocol.core.methods.response.Log;
+import org.web3j.protocol.websocket.events.NewHead;
+import org.web3j.protocol.websocket.events.NewHeadsNotification;
+import org.web3j.protocol.websocket.events.NotificationParams;
+import org.web3j.utils.Bloom;
+import org.web3j.utils.Numeric;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.ConnectException;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.stream.Stream;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@Transactional
+@Slf4j
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@SpringBootTest @ActiveProfiles("test")
+@Import(Web3jConfig.class)
+public class Web3jClientIntegrationTests {
+
+    @MockitoBean
+    Web3j web3j;
+
+    Web3jClient web3jClient;
+
+    @MockitoSpyBean
+    Web3jAdapter web3jClientTestAdapter;
+
+    List<NewHeadsNotification> normalChain;
+    List<NewHeadsNotification> reorgChain;
+
+    @Autowired
+    PublishProcessor<NewHeadsNotification> newHeadPublisher;
+
+    @MockitoSpyBean //MockitoSpyBean wraps a bean so that you can treat them as mock
+    InvoicePaymentService invoicePaymentService;
+    @MockitoSpyBean
+    InvoiceService invoiceService;
+
+    @Autowired
+    AutowireCapableBeanFactory beanFactory;
+
+    public void mockEthGetLogs(List<EthLog.LogResult> logs) {
+
+        doAnswer(inv -> {
+            EthFilter filter = inv.getArgument(0);
+            List<EthLog.LogResult> out = logs;
+
+            if (filter.getBlockHash() != null) {
+                out = out
+                        .stream()
+                        .filter(logResult -> ((Log) logResult.get()).getBlockHash().equals(filter.getBlockHash()))
+                        .toList();
+            }
+
+            if (filter.getToBlock() != null && filter.getFromBlock() != null) {
+                out = out.stream().filter(logResult -> {
+                    Log log = (Log) logResult;
+                    boolean lowerBounded = true;
+                    boolean upperBounded = true;
+
+                    if (!filter.getFromBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
+                        BigInteger lowerBound = Numeric.toBigInt(filter.getFromBlock().getValue());
+                        lowerBounded = lowerBound.compareTo(log.getBlockNumber()) <= 0;
+                    }
+
+                    if (!filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue())) {
+                        BigInteger upperBound = Numeric.toBigInt(filter.getToBlock().getValue());
+                        upperBounded = upperBound.compareTo(log.getBlockNumber()) >= 0;
+                    }
+
+                    return lowerBounded && upperBounded;
+                }).toList();
+            }
+
+            EthLog ethLog = new EthLog();
+            ethLog.setResult(out);
+
+            Request<?, EthLog> request = new Request<>("eth_getLogs", List.of(), null, EthLog.class) { @Override public EthLog send() { return ethLog; } };
+            request.setId(UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE);
+            return request;
+        }).when(web3j).ethGetLogs(any(EthFilter.class));
+    }
+
+    public EthLog.LogObject newLogObj(NewHead block, boolean withTopic, String invoiceId) {
+        EthLog.LogObject logResult = new EthLog.LogObject();
+        if (withTopic) {
+            logResult.setTopics(List.of(Web3jClient.topic0, invoiceId));
+        } else {
+            logResult.setTopics(Collections.emptyList());
+        }
+        logResult.setBlockHash(block.getHash());
+        logResult.setAddress(Web3jClient.CONTRACT_ADDRESS);
+        logResult.setBlockNumber(block.getNumber());
+        return logResult;
+    }
+
+    public EthLog.LogObject newLogObj(NewHead block, boolean withTopic) {
+        return newLogObj(block, withTopic, Hash.sha3String(UUID.randomUUID().toString()));
+    }
+
+    public EthBlock newBlock(String number, String hash, String parentHash) {
+        EthBlock.Block block = new EthBlock.Block();
+        block.setNumber(number);
+        block.setHash(hash);
+        block.setParentHash(parentHash);
+        EthBlock ethBlock = new EthBlock();
+        ethBlock.setResult(block);
+        ethBlock.setId(
+                UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE
+        );
+        return ethBlock;
+    }
+
+    public List<NotificationWithLogs> setupForkChain() {
+        List<NotificationWithLogs> notificationWithLogs = new ArrayList<>();
+        for (NewHeadsNotification newHeadsNotification : reorgChain) {
+            NewHead head = newHeadsNotification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (Bloom.test(head.getLogsBloom(), Web3jClient.CONTRACT_ADDRESS, Web3jClient.topic0)) {
+                invoiceIds.add(Hash.sha3String(UUID.randomUUID().toString()));
+            }
+
+            notificationWithLogs.add(new NotificationWithLogs(newHeadsNotification, invoiceIds));
+        }
+        return notificationWithLogs;
+    }
+
+    public List<NotificationWithLogs> setupNormalChain() {
+        List<NotificationWithLogs> notificationWithLogs = new ArrayList<>();
+        for (NewHeadsNotification newHeadsNotification : normalChain) {
+            NewHead head = newHeadsNotification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (Bloom.test(head.getLogsBloom(), Web3jClient.CONTRACT_ADDRESS, Web3jClient.topic0)) {
+                invoiceIds.add(Hash.sha3String(UUID.randomUUID().toString()));
+            }
+
+            notificationWithLogs.add(new NotificationWithLogs(newHeadsNotification, invoiceIds));
+        }
+        return notificationWithLogs;
+    }
+
+    public void mockChain(List<NotificationWithLogs> notificationWithLogs) throws IOException {
+        List<EthLog.LogResult> allLogs = new ArrayList<>();
+        for (NotificationWithLogs notificationWithLog : notificationWithLogs) {
+            List<String> invoiceIds = notificationWithLog.invoiceIds();
+            NewHeadsNotification newHeadsNotification = notificationWithLog.notification();
+            NewHead head = newHeadsNotification.getParams().getResult();
+            EthBlock block = newBlock(head.getNumber(), head.getHash(), head.getParentHash());
+            assert(Bloom.test(head.getLogsBloom(), Web3jClient.CONTRACT_ADDRESS, Web3jClient.topic0) == !invoiceIds.isEmpty());
+            if (Bloom.test(head.getLogsBloom(), Web3jClient.CONTRACT_ADDRESS, Web3jClient.topic0)) {
+                invoiceIds.forEach(id -> {
+                    allLogs.add(newLogObj(head,true, id));
+                });
+            }
+            mockBlockByNumber(block);
+            mockBlockByHash(block);
+        }
+        mockEthGetLogs(allLogs);
+    }
+
+    public ChainViewBeforeAfterReorg setupReorg(List<NotificationWithLogs> normalNotification, List<NotificationWithLogs> forkNotification, int startingPosition) {
+        assert(startingPosition <= normalNotification.size());
+        List<NotificationWithLogs> beforeReorg = Stream.concat(normalNotification.subList(startingPosition, normalNotification.size()).stream(), Stream.of(forkNotification.get(4))).toList();
+        List<NotificationWithLogs> afterReorg = Stream.concat(normalNotification.subList(0, 6).stream(), forkNotification.subList(0, 5).stream()).toList();
+
+        return new ChainViewBeforeAfterReorg(beforeReorg, afterReorg);
+    }
+
+    public ChainViewBeforeAfterReorg setupReorg(List<NotificationWithLogs> normalNotification, List<NotificationWithLogs> forkNotification) {
+        return setupReorg(normalNotification, forkNotification, 0);
+    }
+
+    public void mockBlockByNumber(EthBlock result) throws IOException {
+        Request<?, EthBlock> request = mock(Request.class);
+        request.setId(result.getId());
+        DefaultBlockParameter exact = DefaultBlockParameter.valueOf(result.getBlock().getNumber());
+        doReturn(request).when(web3j).ethGetBlockByNumber(argThat(val -> val.getValue().equals(exact.getValue())), eq(false));
+        when(request.send()).thenReturn(result);
+    }
+
+    public void mockBlockByHash(EthBlock result) throws IOException {
+        Request<?, EthBlock> request = mock(Request.class);
+        doReturn(request).when(web3j).ethGetBlockByHash(eq(result.getBlock().getHash()), eq(false));
+        when(request.send()).thenReturn(result);
+    }
+
+    public boolean containsPaymentEvent(NewHead block) {
+        return Bloom.test(block.getLogsBloom(), Web3jClient.CONTRACT_ADDRESS, Web3jClient.topic0);
+    }
+
+    public boolean isAfterOrOnCommonAncestor(NewHead block) {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        return Numeric.toBigInt(block.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) >= 0;
+    }
+
+    @BeforeEach
+    public void loadBlockFromJson() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        normalChain = Arrays.stream(objectMapper.readValue(new File("src/test/resources/blocks.json"), NewHeadsNotification[].class)).toList();
+        reorgChain = Arrays.stream(objectMapper.readValue(new File("src/test/resources/reorg-blocks.json"), NewHeadsNotification[].class)).toList();
+    }
+
+    @BeforeEach
+    public void buildClient() throws URISyntaxException, ConnectException {
+        web3jClient = new Web3jClient(web3jClientTestAdapter); //instantiating it like this does not go through autowired
+        beanFactory.autowireBean(web3jClient); //which is why we autowire them manually
+    }
+
+    @AfterEach
+    public void clearMock() {
+        web3jClient.getDisposable().dispose();
+    }
+
+    @Test
+    public void canSeeNewBlock() {
+        NewHeadsNotification mockNotification = Mockito.mock(NewHeadsNotification.class);
+        NotificationParams<NewHead> mockParams = Mockito.mock(NotificationParams.class);
+        NewHead mockNewHead = Mockito.mock(NewHead.class);
+        Mockito.when(mockNotification.getParams()).thenReturn(mockParams);
+        Mockito.when(mockParams.getResult()).thenReturn(mockNewHead);
+
+        newHeadPublisher.onNext(mockNotification);
+
+        Mockito.verify(mockNotification).getParams();
+        Mockito.verify(mockNotification.getParams()).getResult();
+    }
+
+    @Test
+    public void aNewBlockWithoutTopicDoesNotCallEthGetLogs() {
+        newHeadPublisher.onNext(normalChain.getFirst());
+        Mockito.verify(web3j, never()).ethGetLogs(any());
+    }
+
+    @Test
+    public void aNewBlockWithTopicShouldCallEthGetLogs() {
+        NewHeadsNotification blockNotificationWithTopic = normalChain.get(1);
+        NewHead blockWithTopic = blockNotificationWithTopic.getParams().getResult();
+        Assertions.assertTrue(containsPaymentEvent(blockWithTopic));
+        newHeadPublisher.onNext(blockNotificationWithTopic);
+        Mockito.verify(web3j).ethGetLogs(any());
+    }
+
+    @Test
+    public void aNewBlockWithTopicCanFindMultipleTopicLogs() throws IOException {
+        NewHeadsNotification notification = normalChain.get(1);
+        NewHead block = notification.getParams().getResult();
+        EthLog.LogObject logResult1 = newLogObj(block, true);
+        EthLog.LogObject logResult2 = newLogObj(block, true);
+        mockEthGetLogs(List.of(logResult1, logResult2));
+
+        newHeadPublisher.onNext(notification);
+        verify(invoicePaymentService).add(new InvoicePaymentDto(
+                logResult1.getTopics().get(1),
+                Numeric.toBigInt(block.getNumber()),
+                block.getHash()
+        ));
+        verify(invoicePaymentService).add(new InvoicePaymentDto(
+                logResult2.getTopics().get(1),
+                Numeric.toBigInt(block.getNumber()),
+                block.getHash()
+        ));
+    }
+
+    @Test
+    public void aNewBlockWithTopicWillAlwaysCheckForPaymentsToFinalize() throws IOException {
+        NewHeadsNotification notificationWithTopic = normalChain.get(1);
+        NewHead blockWithTopic = notificationWithTopic.getParams().getResult();
+        EthLog.LogObject logResult = newLogObj(blockWithTopic, true);
+        mockEthGetLogs(List.of(logResult));
+        newHeadPublisher.onNext(notificationWithTopic);
+        verify(invoicePaymentService).canFinalize(Numeric.toBigInt(blockWithTopic.getNumber()));
+    }
+
+    @Test
+    public void aNewBlockWithoutTopicWillAlwaysCheckForPaymentsToFinalize() {
+        NewHeadsNotification notificationWithoutTopic = normalChain.getFirst();
+        NewHead blockWithoutTopic = notificationWithoutTopic.getParams().getResult();
+        newHeadPublisher.onNext(notificationWithoutTopic);
+        verify(invoicePaymentService).canFinalize(Numeric.toBigInt(blockWithoutTopic.getNumber()));
+    }
+
+    @Test
+    public void testParsing() {
+        Assertions.assertEquals(10, normalChain.size());
+        Assertions.assertEquals(6, reorgChain.size());
+    }
+
+    @Test
+    public void testChainHasACommonAncestor() {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        NewHead block106 = normalChain.get(6).getParams().getResult();
+        NewHead fork106 = reorgChain.get(0).getParams().getResult();
+
+        Assertions.assertEquals(commonAncestor.getHash(), block106.getParentHash());
+        Assertions.assertEquals(block106.getParentHash(), fork106.getParentHash());
+    }
+
+    @Test
+    public void canDetectReorg() throws IOException {
+        newHeadPublisher.onNext(normalChain.get(0));
+        mockEthGetLogs(List.of(newLogObj(normalChain.get(1).getParams().getResult(), true)));
+        newHeadPublisher.onNext(normalChain.get(1));
+        newHeadPublisher.onNext(normalChain.get(2));
+        newHeadPublisher.onNext(normalChain.get(3));
+        newHeadPublisher.onNext(normalChain.get(4));
+        newHeadPublisher.onNext(normalChain.get(5));
+        newHeadPublisher.onNext(normalChain.get(6));
+        Assertions.assertTrue(web3jClient.isReorg(reorgChain.get(1).getParams().getResult()));
+    }
+
+    @Test
+    public void aReorgWillCheckForPaymentToFinalize() throws IOException {
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(invoicePaymentService).canFinalize(Numeric.toBigInt(reorgChain.get(4).getParams().getResult().getNumber()));
+    }
+
+    @Test
+    public void aReorgSweepsFromCommonAncestorToLatest() throws IOException {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
+
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(web3j).ethGetLogs(argThat(filter -> {
+                    if (filter.getFromBlock() == null && filter.getToBlock() == null) {
+                        return false;
+                    }
+
+                    return filter.getFromBlock().getValue().equals(commonAncestor.getNumber()) &&
+                            filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue()) &&
+                            filter.getAddress().get(0).equals(Web3jClient.CONTRACT_ADDRESS);
+                }
+        ));
+    }
+
+    @Test
+    public void initiallyThereIsNoReorg() {
+        Assertions.assertFalse(web3jClient.isReorg(normalChain.get(0).getParams().getResult()));
+    }
+
+    @Test
+    public void mockGetBlockByNumberGrabsTheCorrectBlock() throws IOException {
+        mockChain(setupNormalChain());
+
+        for (NewHeadsNotification notification : normalChain) {
+            NewHead expectedBlock = notification.getParams().getResult();
+            EthBlock.Block resp = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(Numeric.toBigInt(expectedBlock.getNumber())), false).send().getBlock();
+            Assertions.assertEquals(expectedBlock.getHash(), resp.getHash());
+        }
+    }
+
+    @Test
+    public void mockGetBlockByHashGrabsTheCorrectBlock() throws IOException {
+        mockChain(setupNormalChain());
+
+        for (NewHeadsNotification notification : normalChain) {
+            NewHead expectedBlock = notification.getParams().getResult();
+            EthBlock.Block resp = web3j.ethGetBlockByHash(expectedBlock.getHash(), false).send().getBlock();
+            Assertions.assertEquals(expectedBlock.getHash(), resp.getHash());
+        }
+    }
+
+    @Test
+    public void startProcessingBlockBeforeForkHandlesReorgOK() throws IOException {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain());
+        mockChain(view.before());// current view of chain
+
+        NewHead startingBlock = normalChain.get(0).getParams().getResult();
+        Assertions.assertTrue(Numeric.toBigInt(startingBlock.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) < 0);
+        //Start processing block before fork
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after()); //switch view
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(web3j).ethGetLogs(argThat(filter -> {
+            if (filter.getFromBlock() == null && filter.getToBlock() == null) {
+                return false;
+            }
+
+            return filter.getFromBlock().getValue().equals(commonAncestor.getNumber()) &&
+                    filter.getToBlock().getValue().equals(DefaultBlockParameterName.LATEST.getValue()) &&
+                    filter.getAddress().get(0).equals(Web3jClient.CONTRACT_ADDRESS);
+        }
+        ));
+        verify(web3jClientTestAdapter, never()).onError(any());
+    }
+
+    @Test
+    public void startProcessingBlockAfterForkHandlesReorgOK() throws IOException {
+        NewHead commonAncestor = normalChain.get(5).getParams().getResult();
+
+        int startingIndex = 7;
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), setupForkChain(), startingIndex);
+
+        NewHead startingBlock = normalChain.get(7).getParams().getResult();
+        Assertions.assertTrue(Numeric.toBigInt(startingBlock.getNumber()).compareTo(Numeric.toBigInt(commonAncestor.getNumber())) > 0);
+
+        //Start processing block before fork
+        mockChain(view.before());
+        for (int i = startingIndex; i < normalChain.size(); i++) {
+            newHeadPublisher.onNext(normalChain.get(i));
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4));//trigger reorg
+        verify(web3jClientTestAdapter, never()).onError(any());
+    }
+
+    @Test
+    public void aReorgRevertsEveryPaymentBetweenCommonAncestorAndLatestNotOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> normalChainWithLogs = new ArrayList<>();
+
+        String invoiceToRevert = Hash.sha3String(UUID.randomUUID().toString());
+        String invoiceDoesntRevert = Hash.sha3String(UUID.randomUUID().toString());
+
+        NewHead inBlock = null;
+        for (NewHeadsNotification notification: normalChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceToRevert)));
+                inBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceDoesntRevert)));
+            } else {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        ChainViewBeforeAfterReorg view = setupReorg(normalChainWithLogs, setupForkChain());
+        Assertions.assertNotNull(inBlock); //There is a payment after or in commonAncestor
+
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(invoiceService).revertAll(List.of(invoiceToRevert));
+        verify(invoicePaymentService).removeAllById(List.of(invoiceToRevert));
+        verify(invoiceService, never()).revertAll(List.of(invoiceDoesntRevert));
+        verify(invoicePaymentService, never()).removeAllById(List.of(invoiceDoesntRevert));
+    }
+
+    @Test
+    public void aReorgAddNewPaymentOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> forkChainWithLogs = new ArrayList<>();
+
+        String newInvoiceIdInFork = Hash.sha3String(UUID.randomUUID().toString());
+
+        for (NewHeadsNotification notification: reorgChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(newInvoiceIdInFork)));
+            } else if (containsPaymentEvent(head)) {
+                Assertions.fail(); //reorg-blocks.json blocks always start after common ancestor
+            } else {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        ChainViewBeforeAfterReorg view = setupReorg(setupNormalChain(), forkChainWithLogs);
+
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+        verify(invoiceService).detectPaymentAll(List.of(newInvoiceIdInFork));
+    }
+
+    @Test
+    public void aReorgUpdatePaymentToADifferentBlockOnTheForkChain() throws IOException {
+        List<NotificationWithLogs> normalChainWithLogs = new ArrayList<>();
+        List<NotificationWithLogs> forkChainWithLogs = new ArrayList<>();
+
+        String invoiceIdWillUpdate = Hash.sha3String(UUID.randomUUID().toString());
+        String invoiceRemainedOnBlock = Hash.sha3String(UUID.randomUUID().toString());
+        NewHead oldBlock = null;
+        NewHead newBlock = null;
+
+        for (NewHeadsNotification notification: normalChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceIdWillUpdate)));
+                oldBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceRemainedOnBlock)));
+            } else {
+                normalChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        for (NewHeadsNotification notification: reorgChain) {
+            NewHead head = notification.getParams().getResult();
+            List<String> invoiceIds = new ArrayList<>();
+            if (containsPaymentEvent(head) && isAfterOrOnCommonAncestor(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceIdWillUpdate)));
+                newBlock = head;
+            } else if (containsPaymentEvent(head)) {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, List.of(invoiceRemainedOnBlock)));
+            } else {
+                forkChainWithLogs.add(new NotificationWithLogs(notification, invoiceIds));
+            }
+        }
+
+        Assertions.assertNotNull(oldBlock);
+        Assertions.assertNotNull(newBlock);
+
+        ChainViewBeforeAfterReorg view = setupReorg(normalChainWithLogs, forkChainWithLogs);
+        mockChain(view.before());
+        for (NewHeadsNotification notification : normalChain) {
+            newHeadPublisher.onNext(notification);
+        }
+        mockChain(view.after());
+        newHeadPublisher.onNext(reorgChain.get(4)); //trigger reorg
+
+        Mockito.verify(invoicePaymentService).update(List.of(new InvoicePaymentDto(invoiceIdWillUpdate, Numeric.toBigInt(newBlock.getNumber()), newBlock.getHash())));
+    }
+    
+}
+

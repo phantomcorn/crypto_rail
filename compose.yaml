@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_DB: crypto_rail
+      POSTGRES_DB: pyro_cryo
       POSTGRES_USER: crypto
       POSTGRES_PASSWORD: crypto
     ports:

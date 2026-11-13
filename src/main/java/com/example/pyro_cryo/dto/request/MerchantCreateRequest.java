@@ -1,0 +1,16 @@
+package com.example.pyro_cryo.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class MerchantCreateRequest {
+
+    String username;
+    String password;
+    String name;
+    String merchantAddress;
+    String uri;
+
+}
