@@ -56,6 +56,7 @@ public class InvoiceService {
                         .version(Web3jClient.APP_VERSION)
                         .chainId(Web3jClient.CHAIN_ID)
                         .status(dto.getStatus())
+                        .username(dto.getUsername())
                         .build();
 
         //create voucher (signature + data)

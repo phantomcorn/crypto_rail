@@ -14,4 +14,5 @@ public record InvoiceDto(String id,
                          Long chainId,
                          String signature,
                          BigInteger deadline,
-                         Status status) {}
+                         Status status,
+                         String username) {}

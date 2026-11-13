@@ -58,7 +58,10 @@ public class Invoice {
     @Enumerated(EnumType.STRING)
     Status status = Status.NOT_PAID;
 
+    @Column(name="merchant_username")
+    String username; //who this invoice belongs to
+
     public InvoiceDto toDto() {
-        return new InvoiceDto(id, hashId, merchantAddress, tokenAddress, amount, name, version, chainId, signature, signatureExpiresAt, status);
+        return new InvoiceDto(id, hashId, merchantAddress, tokenAddress, amount, name, version, chainId, signature, signatureExpiresAt, status, username);
     }
 }

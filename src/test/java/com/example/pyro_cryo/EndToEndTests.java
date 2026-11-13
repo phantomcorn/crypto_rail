@@ -17,6 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigInteger;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +47,7 @@ public class EndToEndTests {
 
         mockMvc.perform(
                     post("/api/checkout")
+                            .with(user("user1"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json.writeValueAsString(request))
                 ).andExpect(

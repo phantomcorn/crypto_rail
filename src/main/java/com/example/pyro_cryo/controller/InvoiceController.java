@@ -8,6 +8,8 @@ import com.example.pyro_cryo.service.InvoiceService;
 import com.example.pyro_cryo.utils.Web3jClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,12 +30,13 @@ public class InvoiceController {
     InvoiceService invoiceService;
 
     @PostMapping("/api/checkout")
-    public ResponseEntity<PayResponse> pay(@RequestBody PayRequest request) throws IOException {
+    public ResponseEntity<PayResponse> pay(@RequestBody PayRequest request, @AuthenticationPrincipal UserDetails userDetails) throws IOException {
 
         PayRequestDto dto = PayRequestDto.builder()
                 .amount(request.getAmount())
                 .merchantAddress(request.getMerchantAddress())
                 .tokenAddress(request.getTokenAddress())
+                .username(userDetails.getUsername())
                 .build();
 
 

@@ -16,5 +16,6 @@ public class PayRequestDto {
     private String merchantAddress;
     private String tokenAddress;
     private Status status;
+    private String username; //Who this invoice belongs to
 
 }
