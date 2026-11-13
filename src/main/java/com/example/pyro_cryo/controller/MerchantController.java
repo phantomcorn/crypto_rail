@@ -53,12 +53,14 @@ public class MerchantController {
             return ResponseEntity.status(401).body("Incorrect credentials");
         }
 
-        ResponseCookie accessCookie = ResponseCookie.from("access_token", dto.getAccessToken())
+        ResponseCookie accessCookie = ResponseCookie.from("access_token", dtoWithToken.getAccessToken())
                 .httpOnly(true)
+                .path("/")
                 .build();
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", dto.getRefreshToken())
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", dtoWithToken.getRefreshToken())
                 .httpOnly(true)
+                .path("/")
                 .build();
 
         return ResponseEntity.ok()
